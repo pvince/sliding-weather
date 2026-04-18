@@ -84,9 +84,9 @@ describe('Rectangular config page (index.html)', function () {
     expect(getSelectValue('weatherFrequency')).toBe('30');
   });
 
-  test('default alignment is center (0)', function () {
+  test('default alignment: weather center (0), time left (1)', function () {
     expect(getSelectValue('weatherDateAlignment')).toBe('0');
-    expect(getSelectValue('hourMinutesAlignment')).toBe('0');
+    expect(getSelectValue('hourMinutesAlignment')).toBe('1');
   });
 
   test('static location row hidden when GPS is enabled', function () {

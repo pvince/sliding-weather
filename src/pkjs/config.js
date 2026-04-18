@@ -20,9 +20,9 @@ var DEFAULTS = {
   displayPrefix:        '1',
   displayDate:          '1',
   weatherDateAlignment: '0',
-  hourMinutesAlignment: '0',
-  weatherDateReadability: '1',
+  weatherDateReadability: '0',
   minutesReadability:   '0',
+  hourMinutesAlignment: '1',
   vibrateBT:            '1'
 };
 

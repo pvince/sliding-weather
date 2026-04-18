@@ -4,12 +4,11 @@
 // Constants
 // ============================================================
 
-#define NUM_DIGITS      4
-#define DIGIT_W         26
-#define DIGIT_H         56
-#define DIGIT_GAP       2
-#define COLON_W         16
-#define ANIM_DURATION_MS 300
+#define NUM_TIME_LINES     3
+#define TIME_WORD_MAXLEN   16
+#define LINE_H             49
+#define LINE_GAP           -10
+#define SLIDE_DURATION_MS  800
 
 #define CONDITIONS_MAXLEN      32
 #define WEATHER_TEXT_MAXLEN    48
@@ -40,32 +39,41 @@
 #define DEFAULT_VIBBRATE_BT    1
 #define DEFAULT_WEATHER_GPS    1
 #define DEFAULT_WD_ALIGNMENT   ALIGN_CENTER
-#define DEFAULT_HM_ALIGNMENT   ALIGN_CENTER
-#define DEFAULT_WD_READABILITY RDBL_SMALL_BOLD
-#define DEFAULT_MIN_READABILITY RDBL_SMALL
+#define DEFAULT_HM_ALIGNMENT   ALIGN_LEFT
+#define DEFAULT_WD_READABILITY RDBL_SMALL
 
 // Degree symbol (UTF-8)
 #define DEGREE_SYMBOL "\xc2\xb0"
 
 // ============================================================
-// Types
+// Word lookup tables
 // ============================================================
 
-typedef struct {
-  int current;   // digit value 0-9 currently displayed
-  int next;      // digit value 0-9 animating to
-  int offset;    // animation scroll offset, 0..DIGIT_H
-} DigitState;
+static const char *s_hours[] = {
+  "", "one", "two", "three", "four", "five", "six",
+  "seven", "eight", "nine", "ten", "eleven", "twelve"
+};
+static const char *s_ones[] = {
+  "", "one", "two", "three", "four", "five",
+  "six", "seven", "eight", "nine"
+};
+static const char *s_teens[] = {
+  "ten", "eleven", "twelve", "thirteen", "fourteen",
+  "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"
+};
+static const char *s_tens[] = {
+  "", "", "twenty", "thirty", "forty", "fifty"
+};
 
 // ============================================================
 // Globals
 // ============================================================
 
 static Window         *s_window;
-static Layer          *s_digit_layer[NUM_DIGITS];
-static Layer          *s_colon_layer;
-static DigitState      s_digits[NUM_DIGITS];
-static Animation      *s_anim;
+static TextLayer      *s_time_layer[NUM_TIME_LINES];
+static char            s_time_text[NUM_TIME_LINES][TIME_WORD_MAXLEN];
+static PropertyAnimation *s_line_anim[NUM_TIME_LINES];
+static GRect           s_line_target[NUM_TIME_LINES];
 
 #ifndef PBL_PLATFORM_APLITE
 static TextLayer  *s_weather_layer;
@@ -127,14 +135,6 @@ static GTextAlignment prv_text_alignment(int val) {
   }
 }
 
-static GFont prv_digit_font(void) {
-#if defined(PBL_COLOR)
-  return fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
-#else
-  return fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD);
-#endif
-}
-
 #ifndef PBL_PLATFORM_APLITE
 static GFont prv_weather_font(int readability) {
   switch (readability) {
@@ -147,92 +147,77 @@ static GFont prv_weather_font(int readability) {
 #endif
 
 // ============================================================
-// Digit layers
+// Word time computation
 // ============================================================
 
-static void prv_digit_update_proc(Layer *layer, GContext *ctx) {
-  int *idx_ptr = (int *)layer_get_data(layer);
-  int idx = *idx_ptr;
-  DigitState *d = &s_digits[idx];
-  GRect bounds = layer_get_bounds(layer);
-  GFont font = prv_digit_font();
-  GColor text_color = (idx < 2) ? s_hr_color : s_min_color;
+static void prv_compute_time_words(int hour, int minute,
+                                   char out[NUM_TIME_LINES][TIME_WORD_MAXLEN]) {
+  // hour is already 1..12
+  strncpy(out[0], s_hours[hour], TIME_WORD_MAXLEN - 1);
+  out[0][TIME_WORD_MAXLEN - 1] = '\0';
 
-  graphics_context_set_text_color(ctx, text_color);
-
-  char cur_str[2] = { (char)('0' + d->current), '\0' };
-  char nxt_str[2] = { (char)('0' + d->next),    '\0' };
-
-  if (d->offset == 0) {
-    graphics_draw_text(ctx, cur_str, font, bounds,
-                       GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
+  if (minute == 0) {
+    strncpy(out[1], "o'clock", TIME_WORD_MAXLEN - 1);
+    out[1][TIME_WORD_MAXLEN - 1] = '\0';
+    out[2][0] = '\0';
+  } else if (minute >= 1 && minute <= 9) {
+    strncpy(out[1], "o", TIME_WORD_MAXLEN - 1);
+    out[1][TIME_WORD_MAXLEN - 1] = '\0';
+    strncpy(out[2], s_ones[minute], TIME_WORD_MAXLEN - 1);
+    out[2][TIME_WORD_MAXLEN - 1] = '\0';
+  } else if (minute >= 10 && minute <= 19) {
+    strncpy(out[1], s_teens[minute - 10], TIME_WORD_MAXLEN - 1);
+    out[1][TIME_WORD_MAXLEN - 1] = '\0';
+    out[2][0] = '\0';
+  } else if (minute % 10 == 0) {
+    strncpy(out[1], s_tens[minute / 10], TIME_WORD_MAXLEN - 1);
+    out[1][TIME_WORD_MAXLEN - 1] = '\0';
+    out[2][0] = '\0';
   } else {
-    // Outgoing digit slides upward
-    GRect out_rect = GRect(0, -(int16_t)d->offset, bounds.size.w, bounds.size.h);
-    // Incoming digit enters from below
-    GRect in_rect  = GRect(0, (int16_t)(bounds.size.h - d->offset), bounds.size.w, bounds.size.h);
-    graphics_draw_text(ctx, cur_str, font, out_rect,
-                       GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
-    graphics_draw_text(ctx, nxt_str, font, in_rect,
-                       GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
+    strncpy(out[1], s_tens[minute / 10], TIME_WORD_MAXLEN - 1);
+    out[1][TIME_WORD_MAXLEN - 1] = '\0';
+    strncpy(out[2], s_ones[minute % 10], TIME_WORD_MAXLEN - 1);
+    out[2][TIME_WORD_MAXLEN - 1] = '\0';
   }
-}
-
-static void prv_colon_update_proc(Layer *layer, GContext *ctx) {
-  GRect bounds = layer_get_bounds(layer);
-  graphics_context_set_fill_color(ctx, s_hr_color);
-  int cx = bounds.size.w / 2;
-  int radius = 3;
-  graphics_fill_circle(ctx, GPoint(cx, bounds.size.h / 3),     radius);
-  graphics_fill_circle(ctx, GPoint(cx, 2 * bounds.size.h / 3), radius);
 }
 
 // ============================================================
-// Digit animation
+// Slide animation
 // ============================================================
 
-static void prv_anim_update(Animation *anim, AnimationProgress progress) {
-  (void)anim;
-  for (int i = 0; i < NUM_DIGITS; i++) {
-    if (s_digits[i].current != s_digits[i].next) {
-      s_digits[i].offset = (int)((DIGIT_H * (int32_t)progress) / ANIMATION_NORMALIZED_MAX);
-      layer_mark_dirty(s_digit_layer[i]);
-    }
-  }
+static void prv_slide_stopped(Animation *anim, bool finished, void *context) {
+  (void)anim; (void)finished;
+  int idx = (int)(uintptr_t)context;
+  s_line_anim[idx] = NULL;
 }
 
-static void prv_anim_stopped(Animation *anim, bool finished, void *context) {
-  (void)anim; (void)finished; (void)context;
-  for (int i = 0; i < NUM_DIGITS; i++) {
-    s_digits[i].current = s_digits[i].next;
-    s_digits[i].offset  = 0;
-    layer_mark_dirty(s_digit_layer[i]);
-  }
-  s_anim = NULL;
-}
-
-static void prv_start_animation(void) {
-  if (s_anim) {
-    animation_unschedule(s_anim);
-    s_anim = NULL;
-    // Snap digits to final state before restarting
-    for (int i = 0; i < NUM_DIGITS; i++) {
-      s_digits[i].current = s_digits[i].next;
-      s_digits[i].offset  = 0;
-    }
+static void prv_slide_in_line(int idx) {
+  if (s_line_anim[idx]) {
+    PropertyAnimation *old = s_line_anim[idx];
+    s_line_anim[idx] = NULL;  // clear before unschedule triggers stopped handler
+    animation_unschedule(property_animation_get_animation(old));
+    property_animation_destroy(old);
   }
 
-  static const AnimationImplementation s_impl = {
-    .update = prv_anim_update
-  };
+  Layer *root = window_get_root_layer(s_window);
+  GRect root_bounds = layer_get_bounds(root);
+  int16_t screen_w = root_bounds.size.w;
 
-  s_anim = animation_create();
-  animation_set_implementation(s_anim, &s_impl);
-  animation_set_duration(s_anim, ANIM_DURATION_MS);
-  animation_set_curve(s_anim, AnimationCurveEaseInOut);
-  animation_set_handlers(s_anim,
-    (AnimationHandlers){ .stopped = prv_anim_stopped }, NULL);
-  animation_schedule(s_anim);
+  GRect target = s_line_target[idx];
+  GRect start = GRect(screen_w, target.origin.y, target.size.w, target.size.h);
+
+  Layer *layer = text_layer_get_layer(s_time_layer[idx]);
+  layer_set_frame(layer, start);
+  layer_set_hidden(layer, false);
+
+  s_line_anim[idx] = property_animation_create_layer_frame(layer, &start, &target);
+  Animation *anim = property_animation_get_animation(s_line_anim[idx]);
+  animation_set_duration(anim, SLIDE_DURATION_MS);
+  animation_set_curve(anim, AnimationCurveEaseOut);
+  animation_set_handlers(anim,
+    (AnimationHandlers){ .stopped = prv_slide_stopped },
+    (void *)(uintptr_t)idx);
+  animation_schedule(anim);
 }
 
 // ============================================================
@@ -240,25 +225,22 @@ static void prv_start_animation(void) {
 // ============================================================
 
 static void prv_set_time(struct tm *tick_time) {
-  int hour = tick_time->tm_hour;
-  if (!clock_is_24h_style()) {
-    if (hour == 0)       hour = 12;
-    else if (hour > 12)  hour -= 12;
-  }
+  int hour = tick_time->tm_hour % 12;
+  if (hour == 0) hour = 12;
 
-  int new_vals[NUM_DIGITS] = {
-    hour / 10, hour % 10,
-    tick_time->tm_min / 10, tick_time->tm_min % 10
-  };
+  char new_text[NUM_TIME_LINES][TIME_WORD_MAXLEN];
+  prv_compute_time_words(hour, tick_time->tm_min, new_text);
 
-  bool any_changed = false;
-  for (int i = 0; i < NUM_DIGITS; i++) {
-    s_digits[i].next = new_vals[i];
-    if (new_vals[i] != s_digits[i].current) any_changed = true;
-  }
-
-  if (any_changed) {
-    prv_start_animation();
+  for (int i = 0; i < NUM_TIME_LINES; i++) {
+    if (new_text[i][0] == '\0' && s_time_text[i][0] != '\0') {
+      s_time_text[i][0] = '\0';
+      layer_set_hidden(text_layer_get_layer(s_time_layer[i]), true);
+    } else if (new_text[i][0] != '\0' && strcmp(new_text[i], s_time_text[i]) != 0) {
+      strncpy(s_time_text[i], new_text[i], TIME_WORD_MAXLEN - 1);
+      s_time_text[i][TIME_WORD_MAXLEN - 1] = '\0';
+      text_layer_set_text(s_time_layer[i], s_time_text[i]);
+      prv_slide_in_line(i);
+    }
   }
 }
 
@@ -394,11 +376,12 @@ static void prv_apply_config(void) {
   text_layer_set_text_alignment(s_date_layer,    wd_align);
 #endif
 
-  // Redraw digit and colon layers to pick up new colors
-  for (int i = 0; i < NUM_DIGITS; i++) {
-    layer_mark_dirty(s_digit_layer[i]);
+  // Redraw time layers to pick up new colors/alignment
+  GTextAlignment time_align = prv_text_alignment(s_hourminutes_alignment);
+  for (int i = 0; i < NUM_TIME_LINES; i++) {
+    text_layer_set_text_color(s_time_layer[i], (i == 0) ? s_hr_color : s_min_color);
+    text_layer_set_text_alignment(s_time_layer[i], time_align);
   }
-  if (s_colon_layer) layer_mark_dirty(s_colon_layer);
 }
 
 static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) {
@@ -531,6 +514,7 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   if (hma_t) {
     s_hourminutes_alignment = (int)hma_t->value->int32;
     persist_write_int(MESSAGE_KEY_HOURMINUTES_ALIGNMENT, s_hourminutes_alignment);
+    config_changed = true;
   }
   Tuple *wdr_t = dict_find(iter, MESSAGE_KEY_WEATHERDATE_READABILITY);
   if (wdr_t) {
@@ -623,51 +607,26 @@ static void prv_window_load(Window *window) {
   int16_t w = bounds.size.w;
   int16_t h = bounds.size.h;
 
-  // Calculate time row geometry
-  int16_t time_total_w = (int16_t)(4 * DIGIT_W + 4 * DIGIT_GAP + COLON_W);
-  int16_t time_x       = (w - time_total_w) / 2;
-
-#ifdef PBL_PLATFORM_APLITE
-  // Center vertically on full screen for aplite (time only)
-  int16_t time_y = (h - DIGIT_H) / 2;
-#else
-  // Upper portion; weather/date below
-  int16_t time_y = (int16_t)(h / 6);
-#endif
-
-  // Create digit layers
-  int16_t cx = time_x;
-  for (int i = 0; i < NUM_DIGITS; i++) {
-    // Skip colon gap between H2 and M1
-    if (i == 2) cx = (int16_t)(cx + COLON_W + DIGIT_GAP);
-
-    GRect frame = GRect(cx, time_y, DIGIT_W, DIGIT_H);
-    s_digit_layer[i] = layer_create_with_data(frame, sizeof(int));
-    int *idx_ptr = (int *)layer_get_data(s_digit_layer[i]);
-    *idx_ptr = i;
-    layer_set_update_proc(s_digit_layer[i], prv_digit_update_proc);
-    layer_add_child(root, s_digit_layer[i]);
-
-    s_digits[i].current = 0;
-    s_digits[i].next    = 0;
-    s_digits[i].offset  = 0;
-
-    cx = (int16_t)(cx + DIGIT_W + DIGIT_GAP);
-  }
-
-  // Create colon layer (between H2 and M1)
-  int16_t colon_x = (int16_t)(time_x + 2 * (DIGIT_W + DIGIT_GAP));
-  s_colon_layer = layer_create(GRect(colon_x, time_y, COLON_W, DIGIT_H));
-  layer_set_update_proc(s_colon_layer, prv_colon_update_proc);
-  layer_add_child(root, s_colon_layer);
+  int16_t padding = PBL_IF_ROUND_ELSE(20, 4);
 
 #ifndef PBL_PLATFORM_APLITE
-  // Weather and date layers below time
-  int16_t weather_y = (int16_t)(time_y + DIGIT_H + 10);
-  int16_t date_y    = (int16_t)(weather_y + 22);
-  int16_t row_h     = 22;
-  int16_t padding   = PBL_IF_ROUND_ELSE(20, 4);
+  // Weather at top
+  int16_t weather_y = PBL_IF_ROUND_ELSE(10, 2);
+  int16_t row_h = 22;
+  // Date at bottom
+  int16_t date_y = h - row_h - PBL_IF_ROUND_ELSE(10, 2);
+  // Time words centered between weather bottom and date top
+  int16_t time_block_h = NUM_TIME_LINES * LINE_H + (NUM_TIME_LINES - 1) * LINE_GAP;
+  int16_t time_top = weather_y + row_h;
+  int16_t time_bottom = date_y;
+  int16_t time_start_y = time_top + (time_bottom - time_top - time_block_h) / 2;
+#else
+  int16_t time_block_h = NUM_TIME_LINES * LINE_H + (NUM_TIME_LINES - 1) * LINE_GAP;
+  int16_t time_start_y = (h - time_block_h) / 2;
+#endif
 
+#ifndef PBL_PLATFORM_APLITE
+  // Weather layer (at top)
   GTextAlignment wd_align = prv_text_alignment(s_weatherdate_alignment);
   GFont weather_font = prv_weather_font(s_weatherdate_readability);
 
@@ -679,7 +638,27 @@ static void prv_window_load(Window *window) {
   text_layer_set_text_alignment(s_weather_layer, wd_align);
   text_layer_set_text(s_weather_layer, "Loading...");
   layer_add_child(root, text_layer_get_layer(s_weather_layer));
+#endif
 
+  // Create time word layers
+  GFont hr_font  = fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD);
+  GFont min_font = fonts_get_system_font(FONT_KEY_BITHAM_42_LIGHT);
+  GTextAlignment time_align = prv_text_alignment(s_hourminutes_alignment);
+  for (int i = 0; i < NUM_TIME_LINES; i++) {
+    int16_t ly = time_start_y + i * (LINE_H + LINE_GAP);
+    s_line_target[i] = GRect(padding, ly, w - 2 * padding, LINE_H);
+    s_time_layer[i] = text_layer_create(s_line_target[i]);
+    text_layer_set_background_color(s_time_layer[i], GColorClear);
+    text_layer_set_text_color(s_time_layer[i], (i == 0) ? s_hr_color : s_min_color);
+    text_layer_set_font(s_time_layer[i], (i == 0) ? hr_font : min_font);
+    text_layer_set_text_alignment(s_time_layer[i], time_align);
+    layer_add_child(root, text_layer_get_layer(s_time_layer[i]));
+    s_time_text[i][0] = '\0';
+    s_line_anim[i] = NULL;
+  }
+
+#ifndef PBL_PLATFORM_APLITE
+  // Date layer (at bottom)
   s_date_layer = text_layer_create(
     GRect(padding, date_y, (int16_t)(w - 2 * padding), row_h));
   text_layer_set_background_color(s_date_layer, GColorClear);
@@ -691,20 +670,21 @@ static void prv_window_load(Window *window) {
 
   prv_apply_config();
 
-  // Display current time immediately
+  // Snap to current time WITHOUT animation on initial load
   time_t now = time(NULL);
   struct tm *tick_time = localtime(&now);
-  prv_set_time(tick_time);
-  // Snap digits to final state without animation on load
-  for (int i = 0; i < NUM_DIGITS; i++) {
-    s_digits[i].current = s_digits[i].next;
-    s_digits[i].offset  = 0;
+  char init_text[NUM_TIME_LINES][TIME_WORD_MAXLEN];
+  int hour = tick_time->tm_hour % 12;
+  if (hour == 0) hour = 12;
+  prv_compute_time_words(hour, tick_time->tm_min, init_text);
+  for (int i = 0; i < NUM_TIME_LINES; i++) {
+    strncpy(s_time_text[i], init_text[i], TIME_WORD_MAXLEN - 1);
+    s_time_text[i][TIME_WORD_MAXLEN - 1] = '\0';
+    text_layer_set_text(s_time_layer[i], s_time_text[i]);
+    if (s_time_text[i][0] == '\0') {
+      layer_set_hidden(text_layer_get_layer(s_time_layer[i]), true);
+    }
   }
-  if (s_anim) {
-    animation_unschedule(s_anim);
-    s_anim = NULL;
-  }
-  for (int i = 0; i < NUM_DIGITS; i++) layer_mark_dirty(s_digit_layer[i]);
 
 #ifndef PBL_PLATFORM_APLITE
   prv_update_date_display(tick_time);
@@ -714,16 +694,16 @@ static void prv_window_load(Window *window) {
 static void prv_window_unload(Window *window) {
   (void)window;
 
-  if (s_anim) {
-    animation_unschedule(s_anim);
-    s_anim = NULL;
+  for (int i = 0; i < NUM_TIME_LINES; i++) {
+    if (s_line_anim[i]) {
+      PropertyAnimation *old = s_line_anim[i];
+      s_line_anim[i] = NULL;
+      animation_unschedule(property_animation_get_animation(old));
+      property_animation_destroy(old);
+    }
+    text_layer_destroy(s_time_layer[i]);
+    s_time_layer[i] = NULL;
   }
-  for (int i = 0; i < NUM_DIGITS; i++) {
-    layer_destroy(s_digit_layer[i]);
-    s_digit_layer[i] = NULL;
-  }
-  layer_destroy(s_colon_layer);
-  s_colon_layer = NULL;
 
 #ifndef PBL_PLATFORM_APLITE
   text_layer_destroy(s_weather_layer);
