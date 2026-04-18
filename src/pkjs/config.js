@@ -119,8 +119,8 @@ function buildAppMessage(cfg, messageKeys) {
 // Config URL builder
 // ============================================================
 
-var CONFIG_URL_RECT  = 'https://singleserveapps.github.io/sliding-weather/';
-var CONFIG_URL_ROUND = 'https://singleserveapps.github.io/sliding-weather/config_round.html';
+var CONFIG_URL_RECT  = 'https://pvince.github.io/sliding-weather/';
+var CONFIG_URL_ROUND = 'https://pvince.github.io/sliding-weather/config_round.html';
 
 function getConfigUrl(platform, storedConfig) {
   var base = (platform === 'chalk') ? CONFIG_URL_ROUND : CONFIG_URL_RECT;

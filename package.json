@@ -31,6 +31,7 @@
     "watchapp": {
       "watchface": true
     },
+    "capabilities": ["configurable"],
     "messageKeys": [
       "TEMPERATURE_IN_C",
       "CONDITIONS",

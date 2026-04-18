@@ -29,11 +29,10 @@ A Pebble watchface with sliding digit time animation and OpenWeatherMap weather 
 
 The configuration UI is hosted via GitHub Pages in the `docs/` folder:
 
-- Rectangular watches: `https://<USERNAME>.github.io/sliding-weather/`
-- Round watches (Chalk): `https://<USERNAME>.github.io/sliding-weather/config_round.html`
+- Rectangular watches: `https://pvince.github.io/sliding-weather/`
+- Round watches (Chalk): `https://pvince.github.io/sliding-weather/config_round.html`
 
-To enable, go to your repository **Settings → Pages** and set the source to the `docs/` folder on `main`.  
-Update `CONFIG_URL_RECT` and `CONFIG_URL_ROUND` in [src/pkjs/config.js](src/pkjs/config.js) to match your GitHub Pages URL.
+To enable, go to your repository **Settings → Pages** and set the source to the `docs/` folder on `main`.
 
 ## Development
 
@@ -78,6 +77,7 @@ pebble install --emulator emery     # large display (200×228)
 - **User-supplied API key** — stored only in phone localStorage; never sent to the C watchapp
 - **Aplite time-only** — weather excluded via `#ifndef PBL_PLATFORM_APLITE` to meet memory constraints
 - **Sliding animation** — each digit is a separate `Layer` with a custom `update_proc` that clips two text characters at offset positions; driven by a single `AnimationImplementation` updating scroll offsets each frame
+- **`configurable` capability** — declared in `appinfo.json` and `package.json`; required for the Pebble mobile app to display the settings gear icon next to the watchface, which triggers the `showConfiguration` PebbleKit JS event
 - **Config page via GitHub Pages** — `docs/` folder served as a static site; rectangular and round variants share all fields but the round page omits alignment selects (always centered)
 - **Config page ↔ JS communication** — settings passed back to JS via `pebblejs://close#<encoded_json>`; config URL populated with current settings in URL hash for round-trip editing
 - **Weather fonts** — `FONT_KEY_LECO_42_NUMBERS` on color platforms; `FONT_KEY_BITHAM_42_BOLD` on B&W platforms
