@@ -1,0 +1,84 @@
+{
+  "name": "sliding-weather",
+  "author": "MakeAwesomeHappen",
+  "version": "1.0.0",
+  "keywords": ["pebble-app"],
+  "private": true,
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "jest-environment-jsdom": "^29.0.0"
+  },
+  "dependencies": {},
+  "pebble": {
+    "displayName": "Sliding Weather",
+    "longName": "Sliding Weather",
+    "shortName": "Sliding Weather",
+    "uuid": "10c972fe-7002-42af-8ecb-2b9ab40ae589",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "aplite",
+      "basalt",
+      "chalk",
+      "diorite",
+      "emery",
+      "flint",
+      "gabbro"
+    ],
+    "watchapp": {
+      "watchface": true
+    },
+    "messageKeys": [
+      "TEMPERATURE_IN_C",
+      "CONDITIONS",
+      "BACKGROUND_COLOR",
+      "TIME_COLOR",
+      "WEATHER_FREQUENCY",
+      "USE_CELSIUS",
+      "DISPLAY_O_PREFIX",
+      "DISPLAY_WEATHER",
+      "MIN_SINCE_WEATHER_UPDATE",
+      "WEATHERDATE_ALIGNMENT",
+      "HOURMINUTES_ALIGNMENT",
+      "GET_WEATHER",
+      "TEMPERATURE",
+      "WEATHERDATE_READABILITY",
+      "MINUTES_READABILITY",
+      "TEMPERATURE_LO",
+      "TEMPERATURE_HI",
+      "TEMPERATURE_IN_C_LO",
+      "TEMPERATURE_IN_C_HI",
+      "CONDITION_CODE",
+      "SHAKE_FOR_LOHI",
+      "VIBBRATE_BT_STATUS",
+      "WEATHER_USE_GPS",
+      "WEATHER_LOCATION",
+      "JS_READY",
+      "WD_COLOR",
+      "DISPLAY_DATE",
+      "HR_COLOR",
+      "MIN_COLOR",
+      "OPTIONS"
+    ],
+    "resources": {
+      "media": []
+    }
+  },
+  "jest": {
+    "projects": [
+      {
+        "displayName": "pkjs",
+        "testMatch": ["<rootDir>/test/pkjs/**/*.test.js"],
+        "testEnvironment": "node"
+      },
+      {
+        "displayName": "config-page",
+        "testMatch": ["<rootDir>/test/config-page/**/*.test.js"],
+        "testEnvironment": "jsdom"
+      }
+    ]
+  }
+}
