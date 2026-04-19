@@ -72,6 +72,23 @@ function httpGet(url, callback) {
   var xhr = new XMLHttpRequest();
   xhr.open('GET', url, true);
   xhr.onload = function () {
+    // PebbleKit JS proxies XHR through the phone app; xhr.status may be
+    // 0 or undefined for successful requests.  Only inspect status when
+    // the runtime actually provides a real HTTP status code (>= 100).
+    if (xhr.status >= 100) {
+      if (xhr.status === 401) {
+        callback(new Error('Invalid API Key'), null);
+        return;
+      }
+      if (xhr.status === 429) {
+        callback(new Error('API Rate Limit'), null);
+        return;
+      }
+      if (xhr.status < 200 || xhr.status >= 300) {
+        callback(new Error('Weather Error'), null);
+        return;
+      }
+    }
     try {
       var json = JSON.parse(xhr.responseText);
       callback(null, json);
@@ -80,7 +97,7 @@ function httpGet(url, callback) {
     }
   };
   xhr.onerror = function () {
-    callback(new Error('Network error fetching: ' + url), null);
+    callback(new Error('Network Error'), null);
   };
   xhr.send();
 }
@@ -96,6 +113,7 @@ function httpGet(url, callback) {
 function getWeather(opts, onComplete) {
   if (!opts.apiKey) {
     console.log('No OWM API key configured — skipping weather fetch');
+    onComplete({ message: 'No API Key' });
     return;
   }
 
@@ -104,16 +122,18 @@ function getWeather(opts, onComplete) {
     httpGet(buildCurrentWeatherUrl(coordOpts), function (err, current) {
       if (err) {
         console.log('Current weather error: ' + err.message);
+        onComplete({ message: err.message });
         return;
       }
       var currentData = parseCurrentWeather(current);
       if (!currentData) {
         console.log('Unexpected current weather response structure');
+        onComplete({ message: 'Weather Error' });
         return;
       }
       httpGet(buildForecastUrl(coordOpts), function (errF, forecast) {
         var forecastData = (errF || !forecast) ? null : parseForecast(forecast);
-        onComplete(currentData, forecastData);
+        onComplete(null, currentData, forecastData);
       });
     });
   }
@@ -123,16 +143,18 @@ function getWeather(opts, onComplete) {
     httpGet(buildCurrentWeatherUrl(locOpts), function (err, current) {
       if (err) {
         console.log('Current weather error: ' + err.message);
+        onComplete({ message: err.message });
         return;
       }
       var currentData = parseCurrentWeather(current);
       if (!currentData) {
         console.log('Unexpected current weather response structure');
+        onComplete({ message: 'Weather Error' });
         return;
       }
       httpGet(buildForecastUrl(locOpts), function (errF, forecast) {
         var forecastData = (errF || !forecast) ? null : parseForecast(forecast);
-        onComplete(currentData, forecastData);
+        onComplete(null, currentData, forecastData);
       });
     });
   }
@@ -147,6 +169,8 @@ function getWeather(opts, onComplete) {
         // Fallback to static location if available
         if (opts.location) {
           fetchWithLocation(opts.location);
+        } else {
+          onComplete({ message: 'No Location' });
         }
       },
       { timeout: 15000 }
@@ -161,6 +185,7 @@ function getWeather(opts, onComplete) {
       },
       function (err) {
         console.log('Geolocation fallback error: ' + err.message);
+        onComplete({ message: 'No Location' });
       },
       { timeout: 15000 }
     );

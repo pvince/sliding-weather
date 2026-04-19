@@ -23,17 +23,38 @@ Pebble.addEventListener('ready', function () {
 // Weather request from watchapp
 // ============================================================
 
+// PebbleKit JS delivers payload keys as numeric IDs on the emulator but as
+// string names on real hardware.  Look up by both so the code works everywhere.
+function getPayload(payload, key) {
+  if (payload[key] !== undefined) return payload[key];
+  for (var name in mk) {
+    if (mk[name] === key) return payload[name];
+  }
+  return undefined;
+}
+
 Pebble.addEventListener('appmessage', function (e) {
   var payload = e.payload || {};
-  if (!payload[mk.GET_WEATHER]) return;
+  if (!getPayload(payload, mk.GET_WEATHER)) return;
 
   var apiKey = cfg.getApiKey();
 
   weather.getWeather({
     apiKey:   apiKey,
-    useGPS:   payload[mk.WEATHER_USE_GPS] ? 1 : 0,
-    location: payload[mk.WEATHER_LOCATION] || ''
-  }, function (currentData, forecastData) {
+    useGPS:   getPayload(payload, mk.WEATHER_USE_GPS) ? 1 : 0,
+    location: getPayload(payload, mk.WEATHER_LOCATION) || ''
+  }, function (err, currentData, forecastData) {
+    if (err) {
+      var errMsg = {};
+      errMsg[mk.CONDITIONS] = err.message;
+      Pebble.sendAppMessage(errMsg, function () {
+        console.log('Weather status sent to watchface: ' + err.message);
+      }, function (sendErr) {
+        console.log('Weather status send failed: ' + JSON.stringify(sendErr));
+      });
+      return;
+    }
+
     var msg = {};
     msg[mk.TEMPERATURE]       = currentData.tempF;
     msg[mk.TEMPERATURE_IN_C]  = currentData.tempC;

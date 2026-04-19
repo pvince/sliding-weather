@@ -26,7 +26,7 @@ var MockXHR = (function () {
     this.onload  = null;
     this.onerror = null;
     this.responseText = '';
-    this.status = 200;
+    this.status = 0;  // PebbleKit JS default: 0 (proxy does not set status)
     MockXHR._instances.push(this);
   }
   MockXHR.prototype.open  = jest.fn();
@@ -35,10 +35,11 @@ var MockXHR = (function () {
   MockXHR.reset = function () { MockXHR._instances = []; };
 
   /** Simulate a successful JSON response on the most recent (or nth) request. */
-  MockXHR.respond = function (data, idx) {
+  MockXHR.respond = function (data, idx, status) {
     var i = (idx === undefined) ? MockXHR._instances.length - 1 : idx;
     var xhr = MockXHR._instances[i];
     if (!xhr) throw new Error('No XHR instance at index ' + i);
+    xhr.status = (status !== undefined) ? status : 200;
     xhr.responseText = JSON.stringify(data);
     if (xhr.onload) xhr.onload();
   };

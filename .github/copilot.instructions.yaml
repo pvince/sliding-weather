@@ -12,3 +12,11 @@
   - Code must compile cleanly.
   - Code review sub-agent must not report any issues.
   - All these steps must be completed against the same codebase. If any of these steps fail, you must re-run all the steps after making changes.
+- Install the latest compiled watchface on my pebble using, `pebble install --phone <IP_ADDRESS>`
+
+# My Pebble Watch
+
+- Phone IP Address: 192.168.1.93
+- My pebble watch is connected to my phone with the "Dev Connection" enabled
+
+

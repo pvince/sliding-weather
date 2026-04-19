@@ -6,6 +6,7 @@ A Pebble watchface with sliding digit time animation and OpenWeatherMap weather 
 
 - **Sliding time animation** — each digit slides up and out as the new one rises from below on every minute tick
 - **Live weather** — current temperature + conditions, with optional daily hi/lo on wrist shake
+- **Weather status feedback** — clear on-screen messages for error states: "No API Key", "Invalid API Key", "Loading...", "Network Error", "No Location", "API Rate Limit"
 - **Configurable** — colors, temperature unit (F/C), weather update frequency, GPS or static location, date display, font sizes, alignment, Bluetooth vibration
 - **All platforms** — aplite, basalt, chalk, diorite, emery, flint, gabbro (7 platforms)
 - **Aplite time-only** — original Pebble (aplite) displays time only; weather excluded to fit within memory constraints
@@ -76,6 +77,8 @@ pebble install --emulator emery     # large display (200×228)
 - **OpenWeatherMap only** — Yahoo Weather removed (deprecated since 2019); no hardcoded fallback key
 - **User-supplied API key** — stored only in phone localStorage; never sent to the C watchapp
 - **Aplite time-only** — weather excluded via `#ifndef PBL_PLATFORM_APLITE` to meet memory constraints
+- **PebbleKit JS XHR compatibility** — HTTP status checks guarded by `xhr.status >= 100` because PebbleKit JS proxies XHR through the phone app and may report status `0` for successful requests
+- **Weather persistence** — weather data and status messages are cached on the watch via `persist_*` so the last known state is shown immediately on startup instead of "Loading..." while waiting for the phone's Bluetooth connection and JS layer
 - **Sliding animation** — each digit is a separate `Layer` with a custom `update_proc` that clips two text characters at offset positions; driven by a single `AnimationImplementation` updating scroll offsets each frame
 - **`configurable` capability** — declared in `appinfo.json` and `package.json`; required for the Pebble mobile app to display the settings gear icon next to the watchface, which triggers the `showConfiguration` PebbleKit JS event
 - **Config page via GitHub Pages** — `docs/` folder served as a static site; rectangular and round variants share all fields but the round page omits alignment selects (always centered)

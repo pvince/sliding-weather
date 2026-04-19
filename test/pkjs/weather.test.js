@@ -177,17 +177,20 @@ describe('getWeather', function () {
     jest.clearAllMocks();
   });
 
-  test('does not make any request when apiKey is empty', function () {
+  test('calls back with No API Key error when apiKey is empty', function () {
     var callback = jest.fn();
     weather.getWeather({ apiKey: '', useGPS: 0, location: 'Paris' }, callback);
     expect(MockXHR._instances.length).toBe(0);
-    expect(callback).not.toHaveBeenCalled();
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback.mock.calls[0][0]).toEqual({ message: 'No API Key' });
   });
 
-  test('does not make any request when apiKey is missing', function () {
+  test('calls back with No API Key error when apiKey is missing', function () {
     var callback = jest.fn();
     weather.getWeather({ useGPS: 0, location: 'Paris' }, callback);
     expect(MockXHR._instances.length).toBe(0);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback.mock.calls[0][0]).toEqual({ message: 'No API Key' });
   });
 
   test('uses static location when useGPS=0', function () {
@@ -239,7 +242,9 @@ describe('getWeather', function () {
     }, 1);
 
     expect(callback).toHaveBeenCalledTimes(1);
-    var [current, forecast] = callback.mock.calls[0];
+    expect(callback.mock.calls[0][0]).toBeNull();
+    var current = callback.mock.calls[0][1];
+    var forecast = callback.mock.calls[0][2];
     expect(current.tempC).toBe(20);
     expect(current.conditions).toBe('Clouds');
     expect(forecast.loC).toBe(10);
@@ -259,7 +264,92 @@ describe('getWeather', function () {
     MockXHR.fail(1); // forecast request fails
 
     expect(callback).toHaveBeenCalledTimes(1);
-    var [, forecast] = callback.mock.calls[0];
-    expect(forecast).toBeNull();
+    expect(callback.mock.calls[0][0]).toBeNull();
+    expect(callback.mock.calls[0][2]).toBeNull();
+  });
+
+  test('calls back with Invalid API Key on 401 response', function () {
+    var callback = jest.fn();
+    weather.getWeather({ apiKey: 'BAD', useGPS: 0, location: 'London' }, callback);
+    MockXHR.respond({ cod: 401, message: 'Invalid API key' }, 0, 401);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback.mock.calls[0][0]).toEqual({ message: 'Invalid API Key' });
+  });
+
+  test('calls back with API Rate Limit on 429 response', function () {
+    var callback = jest.fn();
+    weather.getWeather({ apiKey: 'KEY', useGPS: 0, location: 'London' }, callback);
+    MockXHR.respond({ cod: 429, message: 'Too many requests' }, 0, 429);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback.mock.calls[0][0]).toEqual({ message: 'API Rate Limit' });
+  });
+
+  test('calls back with Weather Error on non-200 response', function () {
+    var callback = jest.fn();
+    weather.getWeather({ apiKey: 'KEY', useGPS: 0, location: 'London' }, callback);
+    MockXHR.respond({ cod: 500 }, 0, 500);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback.mock.calls[0][0]).toEqual({ message: 'Weather Error' });
+  });
+
+  test('calls back with Network Error on XHR failure', function () {
+    var callback = jest.fn();
+    weather.getWeather({ apiKey: 'KEY', useGPS: 0, location: 'London' }, callback);
+    MockXHR.fail(0);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback.mock.calls[0][0]).toEqual({ message: 'Network Error' });
+  });
+
+  test('calls back with Weather Error on unexpected response structure', function () {
+    var callback = jest.fn();
+    weather.getWeather({ apiKey: 'KEY', useGPS: 0, location: 'London' }, callback);
+    MockXHR.respond({ unexpected: 'data' }, 0);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback.mock.calls[0][0]).toEqual({ message: 'Weather Error' });
+  });
+
+  test('calls back with No Location when GPS fails and no static location', function () {
+    var callback = jest.fn();
+    global.navigator.geolocation.getCurrentPosition.mockImplementationOnce(
+      function (success, error) { error({ message: 'GPS denied' }); }
+    );
+    weather.getWeather({ apiKey: 'KEY', useGPS: 1 }, callback);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback.mock.calls[0][0]).toEqual({ message: 'No Location' });
+  });
+
+  test('calls back with No Location when GPS fallback fails with no location', function () {
+    var callback = jest.fn();
+    global.navigator.geolocation.getCurrentPosition.mockImplementationOnce(
+      function (success, error) { error({ message: 'GPS denied' }); }
+    );
+    weather.getWeather({ apiKey: 'KEY', useGPS: 0 }, callback);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback.mock.calls[0][0]).toEqual({ message: 'No Location' });
+  });
+
+  test('parses weather when xhr.status is 0 (PebbleKit JS proxy)', function () {
+    var callback = jest.fn();
+    weather.getWeather({ apiKey: 'KEY', useGPS: 0, location: 'London' }, callback);
+
+    // Simulate PebbleKit JS proxy: respond without setting status (stays at 0)
+    var xhr = MockXHR._instances[0];
+    xhr.responseText = JSON.stringify({
+      main: { temp: 293.15 },
+      weather: [{ main: 'Clear', id: 800 }]
+    });
+    xhr.onload();
+
+    // Forecast request
+    var xhr2 = MockXHR._instances[1];
+    xhr2.responseText = JSON.stringify({
+      list: [{ temp: { min: 283.15, max: 303.15 } }]
+    });
+    xhr2.onload();
+
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback.mock.calls[0][0]).toBeNull();
+    expect(callback.mock.calls[0][1].tempC).toBe(20);
+    expect(callback.mock.calls[0][1].conditions).toBe('Clear');
   });
 });

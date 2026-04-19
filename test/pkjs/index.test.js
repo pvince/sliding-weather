@@ -207,7 +207,7 @@ describe('appmessage', function () {
 
   test('sends current weather data to watch via AppMessage', function () {
     weather.getWeather.mockImplementation(function (opts, cb) {
-      cb({ tempF: 72, tempC: 22, conditions: 'Clouds', conditionCode: 804 }, null);
+      cb(null, { tempF: 72, tempC: 22, conditions: 'Clouds', conditionCode: 804 }, null);
     });
     _handlers.appmessage({ payload: { 10011: 1 } });
     expect(Pebble.sendAppMessage).toHaveBeenCalledTimes(1);
@@ -224,6 +224,7 @@ describe('appmessage', function () {
   test('includes hi/lo forecast data in AppMessage when available', function () {
     weather.getWeather.mockImplementation(function (opts, cb) {
       cb(
+        null,
         { tempF: 72, tempC: 22, conditions: 'Clouds', conditionCode: 804 },
         { loF: 55, hiF: 80, loC: 13, hiC: 27 }
       );
@@ -234,5 +235,63 @@ describe('appmessage', function () {
     expect(msg[10016]).toBe(80); // TEMPERATURE_HI
     expect(msg[10017]).toBe(13); // TEMPERATURE_IN_C_LO
     expect(msg[10018]).toBe(27); // TEMPERATURE_IN_C_HI
+  });
+
+  test('sends error status to watch when weather fetch fails with No API Key', function () {
+    weather.getWeather.mockImplementation(function (opts, cb) {
+      cb({ message: 'No API Key' });
+    });
+    _handlers.appmessage({ payload: { 10011: 1 } });
+    expect(Pebble.sendAppMessage).toHaveBeenCalledTimes(1);
+    var msg = Pebble.sendAppMessage.mock.calls[0][0];
+    expect(msg[10001]).toBe('No API Key'); // CONDITIONS
+    expect(msg).not.toHaveProperty('10012'); // No TEMPERATURE
+  });
+
+  test('sends error status to watch when weather fetch fails with Invalid API Key', function () {
+    weather.getWeather.mockImplementation(function (opts, cb) {
+      cb({ message: 'Invalid API Key' });
+    });
+    _handlers.appmessage({ payload: { 10011: 1 } });
+    var msg = Pebble.sendAppMessage.mock.calls[0][0];
+    expect(msg[10001]).toBe('Invalid API Key');
+    expect(msg).not.toHaveProperty('10012');
+  });
+
+  test('sends error status to watch when weather fetch fails with Network Error', function () {
+    weather.getWeather.mockImplementation(function (opts, cb) {
+      cb({ message: 'Network Error' });
+    });
+    _handlers.appmessage({ payload: { 10011: 1 } });
+    var msg = Pebble.sendAppMessage.mock.calls[0][0];
+    expect(msg[10001]).toBe('Network Error');
+    expect(msg).not.toHaveProperty('10012');
+  });
+
+  test('sends error status to watch when weather fetch fails with No Location', function () {
+    weather.getWeather.mockImplementation(function (opts, cb) {
+      cb({ message: 'No Location' });
+    });
+    _handlers.appmessage({ payload: { 10011: 1 } });
+    var msg = Pebble.sendAppMessage.mock.calls[0][0];
+    expect(msg[10001]).toBe('No Location');
+    expect(msg).not.toHaveProperty('10012');
+  });
+
+  // Real hardware delivers payload keys as string names, not numeric IDs.
+  test('handles string-keyed payload from real hardware', function () {
+    weather.getWeather.mockImplementation(function (opts, cb) {
+      cb(null, { tempF: 72, tempC: 22, conditions: 'Clear', conditionCode: 800 }, null);
+    });
+    _handlers.appmessage({ payload: { GET_WEATHER: 1, WEATHER_USE_GPS: 0, WEATHER_LOCATION: 'London' } });
+    expect(weather.getWeather).toHaveBeenCalledTimes(1);
+    var args = weather.getWeather.mock.calls[0][0];
+    expect(args.useGPS).toBe(0);
+    expect(args.location).toBe('London');
+  });
+
+  test('ignores string-keyed payload without GET_WEATHER', function () {
+    _handlers.appmessage({ payload: { SOME_OTHER_KEY: 1 } });
+    expect(weather.getWeather).not.toHaveBeenCalled();
   });
 });

@@ -252,7 +252,11 @@ static void prv_set_time(struct tm *tick_time) {
 
 static void prv_update_weather_display(void) {
   if (!s_weather_valid) {
-    text_layer_set_text(s_weather_layer, "Loading...");
+    if (s_conditions[0] != '\0') {
+      text_layer_set_text(s_weather_layer, s_conditions);
+    } else {
+      text_layer_set_text(s_weather_layer, "Loading...");
+    }
     return;
   }
 
@@ -310,12 +314,27 @@ static void prv_schedule_weather_timer(void) {
   s_weather_timer = app_timer_register(freq_ms, prv_weather_timer_callback, NULL);
 }
 
+/** Schedule a short retry (5 s) when the outbox is temporarily busy. */
+static void prv_schedule_weather_retry(void) {
+  if (s_weather_timer) {
+    app_timer_cancel(s_weather_timer);
+    s_weather_timer = NULL;
+  }
+  s_weather_timer = app_timer_register(5000, prv_weather_timer_callback, NULL);
+}
+
+/** Deferred callback so we never send from inside inbox_received. */
+static void prv_deferred_request_weather(void *data) {
+  (void)data;
+  prv_request_weather();
+}
+
 static void prv_request_weather(void) {
   DictionaryIterator *iter;
   AppMessageResult result = app_message_outbox_begin(&iter);
   if (result != APP_MSG_OK) {
     APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox begin failed: %d", (int)result);
-    prv_schedule_weather_timer();
+    prv_schedule_weather_retry();
     return;
   }
 
@@ -327,6 +346,8 @@ static void prv_request_weather(void) {
   result = app_message_outbox_send();
   if (result != APP_MSG_OK) {
     APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed: %d", (int)result);
+    prv_schedule_weather_retry();
+    return;
   }
 
   prv_schedule_weather_timer();
@@ -392,7 +413,9 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
 #ifndef PBL_PLATFORM_APLITE
   if (js_ready_t && js_ready_t->value->int32 == 1) {
     s_js_ready = true;
-    prv_request_weather();
+    // Defer the weather request — sending from inside inbox_received can
+    // silently drop the outbox message on real Bluetooth hardware.
+    app_timer_register(200, prv_deferred_request_weather, NULL);
     return;
   }
 #else
@@ -425,6 +448,20 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
 
   if (temp_t) {
     s_weather_valid = true;
+    persist_write_bool(MESSAGE_KEY_DISPLAY_WEATHER, true);
+    persist_write_int(MESSAGE_KEY_TEMPERATURE, s_temp_f);
+    persist_write_int(MESSAGE_KEY_TEMPERATURE_IN_C, s_temp_c);
+    persist_write_string(MESSAGE_KEY_CONDITIONS, s_conditions);
+    if (tlo_t)  persist_write_int(MESSAGE_KEY_TEMPERATURE_LO, s_temp_lo_f);
+    if (thi_t)  persist_write_int(MESSAGE_KEY_TEMPERATURE_HI, s_temp_hi_f);
+    if (tloc_t) persist_write_int(MESSAGE_KEY_TEMPERATURE_IN_C_LO, s_temp_lo_c);
+    if (thic_t) persist_write_int(MESSAGE_KEY_TEMPERATURE_IN_C_HI, s_temp_hi_c);
+    prv_update_weather_display();
+  } else if (cond_t) {
+    // Status/error message — no temperature means it's not real weather data
+    s_weather_valid = false;
+    persist_write_bool(MESSAGE_KEY_DISPLAY_WEATHER, false);
+    persist_write_string(MESSAGE_KEY_CONDITIONS, s_conditions);
     prv_update_weather_display();
   }
 #endif
@@ -597,6 +634,32 @@ static void prv_load_config(void) {
   }
 }
 
+#ifndef PBL_PLATFORM_APLITE
+static void prv_load_weather(void) {
+  if (persist_exists(MESSAGE_KEY_CONDITIONS)) {
+    persist_read_string(MESSAGE_KEY_CONDITIONS,
+                        s_conditions, sizeof(s_conditions));
+  }
+  if (persist_exists(MESSAGE_KEY_DISPLAY_WEATHER)) {
+    s_weather_valid = persist_read_bool(MESSAGE_KEY_DISPLAY_WEATHER);
+    if (s_weather_valid) {
+      if (persist_exists(MESSAGE_KEY_TEMPERATURE))
+        s_temp_f = persist_read_int(MESSAGE_KEY_TEMPERATURE);
+      if (persist_exists(MESSAGE_KEY_TEMPERATURE_IN_C))
+        s_temp_c = persist_read_int(MESSAGE_KEY_TEMPERATURE_IN_C);
+      if (persist_exists(MESSAGE_KEY_TEMPERATURE_LO))
+        s_temp_lo_f = persist_read_int(MESSAGE_KEY_TEMPERATURE_LO);
+      if (persist_exists(MESSAGE_KEY_TEMPERATURE_HI))
+        s_temp_hi_f = persist_read_int(MESSAGE_KEY_TEMPERATURE_HI);
+      if (persist_exists(MESSAGE_KEY_TEMPERATURE_IN_C_LO))
+        s_temp_lo_c = persist_read_int(MESSAGE_KEY_TEMPERATURE_IN_C_LO);
+      if (persist_exists(MESSAGE_KEY_TEMPERATURE_IN_C_HI))
+        s_temp_hi_c = persist_read_int(MESSAGE_KEY_TEMPERATURE_IN_C_HI);
+    }
+  }
+}
+#endif
+
 // ============================================================
 // Window lifecycle
 // ============================================================
@@ -688,6 +751,7 @@ static void prv_window_load(Window *window) {
 
 #ifndef PBL_PLATFORM_APLITE
   prv_update_date_display(tick_time);
+  prv_update_weather_display();
 #endif
 }
 
@@ -723,6 +787,9 @@ static void prv_window_unload(Window *window) {
 
 static void prv_init(void) {
   prv_load_config();
+#ifndef PBL_PLATFORM_APLITE
+  prv_load_weather();
+#endif
 
   s_window = window_create();
   window_set_background_color(s_window, s_bg_color);
@@ -743,7 +810,6 @@ static void prv_init(void) {
 #ifndef PBL_PLATFORM_APLITE
   accel_tap_service_subscribe(prv_tap_handler);
   s_js_ready      = false;
-  s_weather_valid = false;
   s_show_lohi     = false;
   s_weather_timer = NULL;
 #endif
