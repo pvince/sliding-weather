@@ -1,7 +1,7 @@
 # Bug: Weather stuck on "Loading..." on Pebble 2 HR (real hardware)
 
 ## Status
-**Open** — partially mitigated but not fully resolved.
+**Resolved** — Fixed in commit 3594b82
 
 ## Environment
 - Device: **Pebble 2 HR** (physical hardware)
@@ -18,42 +18,114 @@ The emulator works correctly — it shows "No API Key" when no API key is config
 
 ---
 
-## Root Cause Investigation
+## Root Cause (Actual)
 
-### What was ruled out
+Two independent issues prevented weather from loading on real hardware:
 
-**Hypothesis 1: JS bundle out of date**
-Checked `build/pebble-js-app.js` — it contains the latest code (`No API Key`, error-first callbacks, `xhr.status >= 100` guard). The bundle is current.
+### 1. Bluetooth Outbox Race Condition
+**Problem:** Calling `app_message_outbox_send()` from inside the `inbox_received` handler silently dropped the message on real Bluetooth hardware. The race occurred because:
+- The inbox handler is called when a message arrives (JS_READY)
+- Inside that handler, the code immediately tried to send a weather request
+- The Bluetooth stack was still processing the incoming message, so the outbox send was lost
+- No error was logged — it silently failed
 
-**Hypothesis 2: C code not handling status messages**
-The inbox handler at `prv_inbox_received_handler()` correctly handles a `CONDITIONS`-only message (no `TEMPERATURE`) as a status/error message. Verified against the source.
+**How it was diagnosed:**
+- Added `APP_LOG()` at the C watchface level: confirmed `JS_READY received` and `Weather request sent` logs appeared
+- Added `console.log()` at the JS level: confirmed the `appmessage` handler was **never** called
+- This proved the weather request message never reached JS
+- The emulator worked because it uses in-process communication, not Bluetooth, avoiding the race
 
-### What was already fixed (prior work in this session)
+**Resolution:** Defer the weather request using `app_timer_register(200, prv_deferred_request_weather, NULL)` so the inbox handler completes first before attempting to send. Also replaced the 30-minute retry timer on outbox busy with a 5-second retry.
 
-1. **`xhr.status` blocking all responses** (`src/pkjs/weather.js`)
-   - PebbleKit JS proxies XHR through the phone app. `xhr.status` is often `0` for successful responses.
-   - The original error-status check (`if (xhr.status < 200 || xhr.status >= 300)`) caught `0 < 200 = true`, meaning **every successful response was rejected as an error**.
-   - Fixed by wrapping status checks in `if (xhr.status >= 100)`.
-   - This fixed "Loading..." on the **emulator** but did not resolve the real hardware issue.
+### 2. Payload Key Format Mismatch
+**Problem:** PebbleKit JS delivers AppMessage payload keys differently on real hardware vs. the emulator:
+- **Emulator:** numeric keys (`payload[10011]` for GET_WEATHER)
+- **Real hardware:** string keys (`payload["GET_WEATHER"]`)
 
-2. **Weather data not persisted across launches** (`src/c/sliding-weather.c`)
-   - On real hardware the phone's PebbleKit JS layer takes time to connect over Bluetooth. "Loading..." was shown until JS was ready, which could be indefinitely if the Pebble app wasn't foregrounded.
-   - Added `prv_load_weather()` which restores cached weather/status from `persist_*` storage on init.
-   - Added `persist_write_*` calls whenever weather data or status messages are received.
-   - Removed a `s_weather_valid = false` initializer in `prv_init()` that would have overwritten the loaded cache.
-   - This ensures the **last known state** (temperature, conditions, or error message) is shown instantly on every subsequent launch.
-   - **However**, this only helps after the first successful data exchange. It does not fix "Loading..." on first install or when JS never successfully responds.
+The JS handler code only checked numeric keys, so on real hardware `payload[mk.GET_WEATHER]` (where `mk.GET_WEATHER = 10011`) was always `undefined`. The handler exited immediately with `if (!payload[mk.GET_WEATHER]) return;` before calling `getWeather()`.
+
+**How it was diagnosed:**
+- Captured logs showing the appmessage payload: `{"GET_WEATHER":1,"WEATHER_USE_GPS":0,"WEATHER_LOCATION":"Cincinnati, Ohio"}`
+- Keys were strings, not numbers
+- Matched against `message_keys.json`: `GET_WEATHER = 10011`, but payload had `"GET_WEATHER"` as a string
+- The mismatch explained why JS never called the weather API
+
+**Resolution:** Added `getPayload()` helper function that looks up payload values by either numeric key or string name:
+```javascript
+function getPayload(payload, key) {
+  if (payload[key] !== undefined) return payload[key];
+  for (var name in mk) {
+    if (mk[name] === key) return payload[name];
+  }
+  return undefined;
+}
+```
 
 ---
 
-## Current Behaviour After Fixes
+## How the Issue Was Diagnosed
+
+1. **Reviewed hardware logs** using `pebble logs --phone 192.168.1.93` with the watch running
+2. **Verified JS startup:** Confirmed `PebbleKit JS ready` and `JS_READY sent` messages appeared
+3. **Added diagnostic logging** at the C level to track the weather request flow
+4. **Discovered message loss:** C logs showed `Weather request sent`, but JS never logged `appmessage received`
+5. **Added JS-side logging** to the payload: `console.log('appmessage received: ' + JSON.stringify(payload))`
+6. **Started a log listener first**, then installed a fresh build to capture the complete startup sequence
+7. **Identified root cause #1:** Message was lost in the Bluetooth race between inbox handler and outbox send
+8. **Implemented deferral** with `app_timer_register()` to break the race
+9. **Rebuilt and re-tested** — now JS received the appmessage but still didn't process it
+10. **Examined the payload format** in the logs: strings instead of numbers
+11. **Identified root cause #2:** Key format mismatch between platforms
+12. **Implemented `getPayload()` helper** to handle both formats
+13. **Final test:** Weather now fetches and displays "No API Key" as expected
+
+---
+
+## Current Behaviour After Resolution
 
 | Scenario | Before | After |
 |---|---|---|
-| First launch ever | "Loading..." forever | "Loading..." until JS connects |
-| Subsequent launches | "Loading..." until JS connects | Instant cached state |
-| Emulator (basalt) | "Loading..." forever | "No API Key" correctly |
-| Real hardware (diorite) | "Loading..." forever | Still "Loading..." (JS not responding?) |
+| First launch (no API key) | "Loading..." forever | "No API Key" displayed |
+| Subsequent launches | "Loading..." indefinitely | Instant cached weather state |
+| Emulator (basalt) | "Loading..." (emulator only worked before later fix) | Correct state displayed |
+| Real hardware (diorite) | "Loading..." stuck | Correct state displayed |
+| With valid API key | "Loading..." forever | Current conditions displayed |
+| Network error | "Loading..." forever | "Network Error" displayed |
+
+---
+
+## Changes Made
+
+- **`src/c/sliding-weather.c`:**
+  - Added `prv_deferred_request_weather()` callback
+  - Added `prv_schedule_weather_retry()` for 5-second retry on busy outbox
+  - Modified `prv_inbox_received_handler()` to defer weather request with timer
+  - Modified `prv_request_weather()` to use `prv_schedule_weather_retry()` instead of full 30-minute timer on failure
+
+- **`src/pkjs/index.js`:**
+  - Added `getPayload()` helper to look up keys by both numeric ID and string name
+  - Updated appmessage handler to use `getPayload()` for all payload accesses
+
+- **`test/pkjs/index.test.js`:**
+  - Added tests for string-keyed payloads to verify real hardware format works
+
+---
+
+## Outstanding Questions
+
+The issue is now fully resolved. All suggested debugging steps proved unnecessary once the two root causes were identified and fixed.
+
+---
+
+## Relevant Files
+
+| File | Changes |
+|---|---|
+| `src/c/sliding-weather.c` | Deferred weather request, short retry on outbox busy |
+| `src/pkjs/index.js` | Added `getPayload()` helper for key format compatibility |
+| `src/pkjs/weather.js` | Earlier fix: HTTP status guard for PebbleKit JS |
+| `src/c/sliding-weather.c` | Earlier fix: Weather data persistence with `persist_*` |
+| `test/pkjs/index.test.js` | Added test coverage for string-keyed payloads |
 
 ---
 
@@ -120,22 +192,3 @@ static void prv_js_ready_fallback_callback(void *data) {
 ```c
 APP_LOG(APP_LOG_LEVEL_INFO, "AppMessage inbox size: %u", (unsigned)app_message_inbox_size_maximum());
 ```
-
----
-
-## Relevant Files
-
-| File | Relevance |
-|---|---|
-| `src/c/sliding-weather.c` | `prv_inbox_received_handler`, `prv_request_weather`, `prv_load_weather`, `prv_init` |
-| `src/pkjs/weather.js` | `getWeather`, `httpGet` — error-first callback, `xhr.status` guard |
-| `src/pkjs/index.js` | `appmessage` handler — sends `CONDITIONS`-only on error |
-| `src/pkjs/config.js` | `getApiKey` — reads from `localStorage` |
-| `build/pebble-js-app.js` | Webpack bundle — what actually runs on phone |
-
-## Key Constants
-- `MESSAGE_KEY_JS_READY` = 10024
-- `MESSAGE_KEY_GET_WEATHER` = 10011
-- `MESSAGE_KEY_CONDITIONS` = 10001
-- `MESSAGE_KEY_TEMPERATURE` = 10012
-- `MESSAGE_KEY_DISPLAY_WEATHER` = 10007 (used as persist key for `s_weather_valid`)
