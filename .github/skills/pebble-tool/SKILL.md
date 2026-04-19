@@ -123,6 +123,10 @@ pebble emu-accel custom --file data.csv      # custom CSV: each line is "x, y, z
 pebble emu-time-format --format 24h          # 12h or 24h
 pebble emu-set-time 14:30:00                 # set emulated time (HH:MM:SS or Unix seconds)
 pebble emu-set-time 14:30:00 --utc           # interpret as UTC (default: local time)
+# To set a specific date AND time, use a Unix timestamp:
+#   python3 -c "from datetime import datetime; print(int(datetime(2026,1,31,12,17).timestamp()))"
+# then: pebble emu-set-time <unix-timestamp>
+# Note: HH:MM:SS format only changes the time-of-day; the date stays as today.
 pebble emu-set-timeline-quick-view on        # show/hide timeline quick view (on/off)
 pebble emu-set-content-size medium           # set content size: small, medium, large, x-large
 pebble emu-button click select               # click a button (press+release)
