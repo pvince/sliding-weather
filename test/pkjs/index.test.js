@@ -1,6 +1,9 @@
 'use strict';
 
 jest.mock('../../src/pkjs/weather');
+jest.mock('@rebble/clay', function () {
+  return jest.fn().mockImplementation(function () { return {}; });
+});
 
 require('../mocks/pebble');
 var weather = require('../../src/pkjs/weather');
@@ -10,7 +13,7 @@ require('../../src/pkjs/index');
 
 // Capture handlers immediately, before any jest.clearAllMocks() calls.
 var _handlers = {};
-['ready', 'appmessage', 'showConfiguration', 'webviewclosed'].forEach(function (name) {
+['ready', 'appmessage'].forEach(function (name) {
   var call = Pebble.addEventListener.mock.calls.find(function (c) { return c[0] === name; });
   if (call) _handlers[name] = call[1];
 });
@@ -31,14 +34,6 @@ describe('event listener registration', function () {
     expect(_handlers.ready).toBeDefined();
   });
 
-  test('registers showConfiguration handler', function () {
-    expect(_handlers.showConfiguration).toBeDefined();
-  });
-
-  test('registers webviewclosed handler', function () {
-    expect(_handlers.webviewclosed).toBeDefined();
-  });
-
   test('registers appmessage handler', function () {
     expect(_handlers.appmessage).toBeDefined();
   });
@@ -54,124 +49,6 @@ describe('ready', function () {
     expect(Pebble.sendAppMessage).toHaveBeenCalledTimes(1);
     var msg = Pebble.sendAppMessage.mock.calls[0][0];
     expect(msg[10024]).toBe(1); // JS_READY = 10024
-  });
-});
-
-// ============================================================
-// showConfiguration
-// ============================================================
-
-describe('showConfiguration', function () {
-  test('opens rectangular config URL for basalt platform', function () {
-    _handlers.showConfiguration();
-    expect(Pebble.openURL).toHaveBeenCalledTimes(1);
-    var url = Pebble.openURL.mock.calls[0][0];
-    expect(url).not.toContain('config_round.html');
-    expect(url).toContain('pvince.github.io/sliding-weather/');
-  });
-
-  test('opens round config URL for chalk platform', function () {
-    global.Pebble.getActiveWatchInfo.mockReturnValue({ platform: 'chalk' });
-    _handlers.showConfiguration();
-    expect(Pebble.openURL).toHaveBeenCalledTimes(1);
-    var url = Pebble.openURL.mock.calls[0][0];
-    expect(url).toContain('config_round.html');
-  });
-
-  test('opens rectangular config URL for aplite platform', function () {
-    global.Pebble.getActiveWatchInfo.mockReturnValue({ platform: 'aplite' });
-    _handlers.showConfiguration();
-    expect(Pebble.openURL).toHaveBeenCalledTimes(1);
-    var url = Pebble.openURL.mock.calls[0][0];
-    expect(url).not.toContain('config_round.html');
-  });
-
-  test('still opens URL when getActiveWatchInfo throws', function () {
-    global.Pebble.getActiveWatchInfo.mockImplementation(function () {
-      throw new Error('Not supported');
-    });
-    _handlers.showConfiguration();
-    expect(Pebble.openURL).toHaveBeenCalledTimes(1);
-  });
-
-  test('appends stored config as URL hash when config exists', function () {
-    global.localStorage.setItem('sliding_weather_config', JSON.stringify({ useCelsius: '1' }));
-    _handlers.showConfiguration();
-    expect(Pebble.openURL).toHaveBeenCalledTimes(1);
-    var url = Pebble.openURL.mock.calls[0][0];
-    expect(url).toContain('#');
-    var hash = decodeURIComponent(url.split('#')[1]);
-    expect(JSON.parse(hash)).toEqual({ useCelsius: '1' });
-  });
-
-  test('does not append hash when no stored config', function () {
-    _handlers.showConfiguration();
-    expect(Pebble.openURL).toHaveBeenCalledTimes(1);
-    var url = Pebble.openURL.mock.calls[0][0];
-    expect(url).not.toContain('#');
-  });
-});
-
-// ============================================================
-// webviewclosed
-// ============================================================
-
-describe('webviewclosed', function () {
-  test('sends config to watchface on valid response', function () {
-    var response = encodeURIComponent(JSON.stringify({
-      backgroundColor: 'ff0000',
-      weatherFrequency: '30'
-    }));
-    _handlers.webviewclosed({ response: response });
-    expect(Pebble.sendAppMessage).toHaveBeenCalledTimes(1);
-  });
-
-  test('stores API key in localStorage and excludes it from AppMessage', function () {
-    var response = encodeURIComponent(JSON.stringify({
-      owmApiKey: 'my-secret-key',
-      backgroundColor: 'ffffff'
-    }));
-    _handlers.webviewclosed({ response: response });
-    expect(global.localStorage.setItem).toHaveBeenCalledWith(
-      'sliding_weather_owm_api_key', 'my-secret-key'
-    );
-    var msg = Pebble.sendAppMessage.mock.calls[0][0];
-    expect(Object.values(msg)).not.toContain('my-secret-key');
-  });
-
-  test('stores remaining config fields in localStorage', function () {
-    var response = encodeURIComponent(JSON.stringify({
-      backgroundColor: 'ff0000',
-      useCelsius: '1'
-    }));
-    _handlers.webviewclosed({ response: response });
-    var setCall = global.localStorage.setItem.mock.calls.find(function (c) {
-      return c[0] === 'sliding_weather_config';
-    });
-    expect(setCall).toBeDefined();
-    var stored = JSON.parse(setCall[1]);
-    expect(stored.backgroundColor).toBe('ff0000');
-    expect(stored.useCelsius).toBe('1');
-  });
-
-  test('does nothing when response is CANCELLED', function () {
-    _handlers.webviewclosed({ response: 'CANCELLED' });
-    expect(Pebble.sendAppMessage).not.toHaveBeenCalled();
-  });
-
-  test('does nothing when response is empty string', function () {
-    _handlers.webviewclosed({ response: '' });
-    expect(Pebble.sendAppMessage).not.toHaveBeenCalled();
-  });
-
-  test('does nothing when event has no response property', function () {
-    _handlers.webviewclosed({});
-    expect(Pebble.sendAppMessage).not.toHaveBeenCalled();
-  });
-
-  test('does nothing when response is invalid JSON', function () {
-    _handlers.webviewclosed({ response: encodeURIComponent('not valid json {{{') });
-    expect(Pebble.sendAppMessage).not.toHaveBeenCalled();
   });
 });
 

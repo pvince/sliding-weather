@@ -1,5 +1,11 @@
 'use strict';
 
+var Clay       = require('@rebble/clay');
+var clayConfig = require('./clay-config');
+var customClay = require('./custom-clay');
+// eslint-disable-next-line no-unused-vars
+var clay       = new Clay(clayConfig, customClay);
+
 var weather = require('./weather');
 var cfg     = require('./config');
 var mk      = require('../../build/js/message_keys.json');
@@ -73,53 +79,5 @@ Pebble.addEventListener('appmessage', function (e) {
     }, function (err) {
       console.log('Weather send failed: ' + JSON.stringify(err));
     });
-  });
-});
-
-// ============================================================
-// Configuration UI
-// ============================================================
-
-Pebble.addEventListener('showConfiguration', function () {
-  var platform = '';
-  try {
-    platform = Pebble.getActiveWatchInfo().platform;
-  } catch (e) {
-    console.log('getActiveWatchInfo failed: ' + e.message);
-  }
-  var storedRaw = cfg.loadStoredConfig();
-  var url = cfg.getConfigUrl(platform, storedRaw);
-  console.log('Opening config URL: ' + url);
-  Pebble.openURL(url);
-});
-
-Pebble.addEventListener('webviewclosed', function (e) {
-  if (!e.response || e.response === 'CANCELLED') return;
-
-  var raw;
-  try {
-    raw = JSON.parse(decodeURIComponent(e.response));
-  } catch (err) {
-    console.log('Failed to parse config response: ' + err.message);
-    return;
-  }
-
-  // Store API key separately in localStorage (never sent to C watchapp)
-  if (raw.owmApiKey !== undefined) {
-    cfg.storeApiKey(raw.owmApiKey);
-    delete raw.owmApiKey;
-  }
-
-  // Persist the rest of the raw config for pre-populating the config page next time
-  cfg.storeConfig(raw);
-
-  // Parse and build message to send to C watchapp
-  var parsed = cfg.parseConfigResponse(raw);
-  var msg    = cfg.buildAppMessage(parsed, mk);
-
-  Pebble.sendAppMessage(msg, function () {
-    console.log('Config sent to watchface');
-  }, function (err) {
-    console.log('Config send failed: ' + JSON.stringify(err));
   });
 });

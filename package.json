@@ -2,7 +2,9 @@
   "name": "sliding-weather",
   "author": "vincentp",
   "version": "1.0.0",
-  "keywords": ["pebble-app"],
+  "keywords": [
+    "pebble-app"
+  ],
   "private": true,
   "scripts": {
     "test": "jest"
@@ -11,7 +13,9 @@
     "jest": "^29.0.0",
     "jest-environment-jsdom": "^29.0.0"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@rebble/clay": "^1.0.8"
+  },
   "pebble": {
     "displayName": "Sliding Weather",
     "longName": "Sliding Weather",
@@ -31,7 +35,10 @@
     "watchapp": {
       "watchface": true
     },
-    "capabilities": ["configurable", "location"],
+    "capabilities": [
+      "configurable",
+      "location"
+    ],
     "messageKeys": [
       "TEMPERATURE_IN_C",
       "CONDITIONS",
@@ -72,13 +79,10 @@
     "projects": [
       {
         "displayName": "pkjs",
-        "testMatch": ["<rootDir>/test/pkjs/**/*.test.js"],
+        "testMatch": [
+          "<rootDir>/test/pkjs/**/*.test.js"
+        ],
         "testEnvironment": "node"
-      },
-      {
-        "displayName": "config-page",
-        "testMatch": ["<rootDir>/test/config-page/**/*.test.js"],
-        "testEnvironment": "jsdom"
       }
     ]
   }
