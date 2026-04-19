@@ -1,6 +1,6 @@
 {
   "name": "sliding-weather",
-  "author": "MakeAwesomeHappen",
+  "author": "vincentp",
   "version": "1.0.0",
   "keywords": ["pebble-app"],
   "private": true,
@@ -31,7 +31,7 @@
     "watchapp": {
       "watchface": true
     },
-    "capabilities": ["configurable"],
+    "capabilities": ["configurable", "location"],
     "messageKeys": [
       "TEMPERATURE_IN_C",
       "CONDITIONS",
