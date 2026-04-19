@@ -66,7 +66,10 @@ pebble install --emulator emery     # large display (200×228)
 
 | Component | Location | Description |
 |-----------|----------|-------------|
-| C watchface | `src/c/sliding-weather.c` | Sliding digit animation, weather/date display, config persistence via `persist_*`, AppMessage handler |
+| C main | `src/c/main.c` | App entry point, window lifecycle, tick/BT/inbox handlers, unobstructed area handler |
+| Config module | `src/c/modules/config.h/.c` | Config state, persistence, color/alignment/font helpers, inbox config parsing |
+| Time display module | `src/c/modules/time_display.h/.c` | Word computation, slide animation, time layer create/destroy/relayout |
+| Weather module | `src/c/modules/weather.h/.c` | Weather/date layers, OWM request/timer, tap handler, persisted cache (color platforms only) |
 | PebbleKit JS entry | `src/pkjs/index.js` | Pebble event listeners (`ready`, `appmessage`, `showConfiguration`, `webviewclosed`) |
 | Weather logic | `src/pkjs/weather.js` | OWM API requests, response parsing, Kelvin→F/C conversions |
 | Config logic | `src/pkjs/config.js` | Config JSON parsing, AppMessage building, localStorage helpers |
@@ -77,14 +80,16 @@ pebble install --emulator emery     # large display (200×228)
 
 - **OpenWeatherMap only** — Yahoo Weather removed (deprecated since 2019); no hardcoded fallback key
 - **User-supplied API key** — stored only in phone localStorage; never sent to the C watchapp
-- **Aplite time-only** — weather excluded via `#ifndef PBL_PLATFORM_APLITE` to meet memory constraints
+- **Aplite time-only** — weather excluded via `#if defined(PBL_COLOR)` feature define (per Rebble best practices: use capability defines, not platform defines)
 - **PebbleKit JS XHR compatibility** — HTTP status checks guarded by `xhr.status >= 100` because PebbleKit JS proxies XHR through the phone app and may report status `0` for successful requests
 - **Weather persistence** — weather data and status messages are cached on the watch via `persist_*` so the last known state is shown immediately on startup instead of "Loading..." while waiting for the phone's Bluetooth connection and JS layer
-- **Sliding animation** — each digit is a separate `Layer` with a custom `update_proc` that clips two text characters at offset positions; driven by a single `AnimationImplementation` updating scroll offsets each frame
+- **Sliding animation** — each time word is a separate `TextLayer` animated via `PropertyAnimation` sliding in from the right edge
+- **Unobstructed area support** — layout uses `layer_get_unobstructed_bounds()` and subscribes to `UnobstructedAreaHandlers` to dynamically adjust when Timeline Quick View appears/disappears
+- **Modular C architecture** — follows [Rebble modular app architecture](https://developer.repebble.com/guides/best-practices/modular-app-architecture/) guide; C code split into `config`, `time_display`, and `weather` modules in `src/c/modules/`
 - **`configurable` capability** — declared in `appinfo.json` and `package.json`; required for the Pebble mobile app to display the settings gear icon next to the watchface, which triggers the `showConfiguration` PebbleKit JS event
 - **Config page via GitHub Pages** — `docs/` folder served as a static site; rectangular and round variants share all fields but the round page omits alignment selects (always centered)
 - **Config page ↔ JS communication** — settings passed back to JS via `pebblejs://close#<encoded_json>`; config URL populated with current settings in URL hash for round-trip editing
-- **Weather fonts** — `FONT_KEY_LECO_42_NUMBERS` on color platforms; `FONT_KEY_BITHAM_42_BOLD` on B&W platforms
+- **Weather fonts** — `FONT_KEY_GOTHIC_*` on color platforms (size and weight configurable via readability setting); time words use `FONT_KEY_BITHAM_42_BOLD` for the hour and `FONT_KEY_BITHAM_42_LIGHT` for minutes
 - **Shake for hi/lo** — wrist tap toggles between current temperature and daily hi/lo; requires accelerometer tap service (non-aplite only)
 
 ## Message Keys
