@@ -11,6 +11,7 @@ A Pebble watchface with sliding digit time animation and OpenWeatherMap weather 
 - **Configurable** — colors, temperature unit (F/C), weather update frequency, GPS or static location, date display, font sizes, alignment, Bluetooth vibration (powered by [Clay](https://github.com/pebble-dev/clay)) (powered by [Clay](https://github.com/pebble-dev/clay))
 - **All platforms** — aplite, basalt, chalk, diorite, emery, flint, gabbro (7 platforms)
 - **Aplite time-only** — original Pebble (aplite) displays time only; weather excluded to fit within memory constraints
+- **Bluetooth disconnect indicator** — displays a ✗ symbol in the top-right corner when Bluetooth is disconnected; hidden when connected
 - **Round watch layout** — Chalk (Pebble Time Round) automatically hides alignment options via Clay capabilitiesay capabilities
 
 ## Requirements
@@ -64,6 +65,7 @@ pebble install --emulator emery     # large display (200×228)
 | Config module | `src/c/modules/config.h/.c` | Config state, persistence, color/alignment/font helpers, inbox config parsing |
 | Time display module | `src/c/modules/time_display.h/.c` | Word computation, slide animation, time layer create/destroy/relayout |
 | Weather module | `src/c/modules/weather.h/.c` | Weather/date layers, OWM request/timer, tap handler, persisted cache (color platforms only) |
+| BT indicator module | `src/c/modules/bt_indicator.h/.c` | Bluetooth disconnect indicator — shows ✗ in top-right corner when BT is disconnected (all platforms) |
 | PebbleKit JS entry | `src/pkjs/index.js` | Pebble event listeners (`ready`, `appmessage`); Clay initialization |
 | Weather logic | `src/pkjs/weather.js` | OWM API requests, response parsing, Kelvin→F/C conversions |
 | Config logic | `src/pkjs/config.js` | API key localStorage helpers |

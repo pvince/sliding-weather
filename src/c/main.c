@@ -2,6 +2,7 @@
 
 #include "modules/config.h"
 #include "modules/time_display.h"
+#include "modules/bt_indicator.h"
 #if !defined(PBL_PLATFORM_APLITE)
 #include "modules/weather.h"
 #endif
@@ -17,6 +18,7 @@ static Window *s_window;
 // ============================================================
 
 static void prv_bt_handler(bool connected) {
+  bt_indicator_set_status(connected);
   if (!connected && config_get_vibbrate_bt()) {
     vibes_double_pulse();
   }
@@ -134,6 +136,7 @@ static void prv_window_load(Window *window) {
 #endif
 
   time_display_create(window, time_start_y, padding);
+  bt_indicator_create(window);
 
   // Snap to current time WITHOUT animation on initial load
   time_t now = time(NULL);
@@ -149,6 +152,7 @@ static void prv_window_load(Window *window) {
 
 static void prv_window_unload(Window *window) {
   (void)window;
+  bt_indicator_destroy();
   time_display_destroy();
 
 #if !defined(PBL_PLATFORM_APLITE)
