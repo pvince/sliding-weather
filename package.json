@@ -43,18 +43,15 @@
       "TEMPERATURE_IN_C",
       "CONDITIONS",
       "BACKGROUND_COLOR",
-      "TIME_COLOR",
       "WEATHER_FREQUENCY",
       "USE_CELSIUS",
       "DISPLAY_O_PREFIX",
       "DISPLAY_WEATHER",
-      "MIN_SINCE_WEATHER_UPDATE",
       "WEATHERDATE_ALIGNMENT",
       "HOURMINUTES_ALIGNMENT",
       "GET_WEATHER",
       "TEMPERATURE",
       "WEATHERDATE_READABILITY",
-      "MINUTES_READABILITY",
       "TEMPERATURE_LO",
       "TEMPERATURE_HI",
       "TEMPERATURE_IN_C_LO",
@@ -68,8 +65,7 @@
       "WD_COLOR",
       "DISPLAY_DATE",
       "HR_COLOR",
-      "MIN_COLOR",
-      "OPTIONS"
+      "MIN_COLOR"
     ],
     "resources": {
       "media": []

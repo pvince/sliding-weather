@@ -55,7 +55,7 @@ describe('clay-config message keys', function () {
     var excluded = [
       'TEMPERATURE', 'TEMPERATURE_IN_C', 'CONDITIONS', 'CONDITION_CODE',
       'TEMPERATURE_LO', 'TEMPERATURE_HI', 'TEMPERATURE_IN_C_LO', 'TEMPERATURE_IN_C_HI',
-      'GET_WEATHER', 'JS_READY'
+      'GET_WEATHER', 'JS_READY', 'DISPLAY_WEATHER'
     ];
     excluded.forEach(function (key) {
       expect(messageKeys).not.toContain(key);
@@ -65,6 +65,58 @@ describe('clay-config message keys', function () {
   test('has no duplicate message keys', function () {
     var unique = messageKeys.filter(function (v, i, a) { return a.indexOf(v) === i; });
     expect(unique.length).toBe(messageKeys.length);
+  });
+});
+
+// ============================================================
+// MessageKey inventory — every key in package.json must be accounted for
+// ============================================================
+
+describe('messageKey inventory (package.json completeness)', function () {
+  var pkg = require('../../package.json');
+  var packageKeys = pkg.pebble.messageKeys.slice().sort();
+
+  // Keys that belong to Clay config items (phone → watch settings)
+  var clayKeys = [
+    'BACKGROUND_COLOR', 'HR_COLOR', 'MIN_COLOR', 'WD_COLOR',
+    'WEATHER_USE_GPS', 'WEATHER_LOCATION', 'USE_CELSIUS', 'WEATHER_FREQUENCY',
+    'SHAKE_FOR_LOHI', 'DISPLAY_O_PREFIX', 'DISPLAY_DATE', 'VIBBRATE_BT_STATUS',
+    'WEATHERDATE_ALIGNMENT', 'HOURMINUTES_ALIGNMENT', 'WEATHERDATE_READABILITY'
+  ];
+
+  // Keys used for weather data transfer (JS → watch)
+  var weatherDataKeys = [
+    'TEMPERATURE', 'TEMPERATURE_IN_C', 'CONDITIONS', 'CONDITION_CODE',
+    'TEMPERATURE_LO', 'TEMPERATURE_HI', 'TEMPERATURE_IN_C_LO', 'TEMPERATURE_IN_C_HI'
+  ];
+
+  // Control / handshake keys
+  var controlKeys = [
+    'GET_WEATHER',  // watch → phone: request weather
+    'JS_READY'      // phone → watch: JS layer ready
+  ];
+
+  // Internal C-only keys (used for persist storage, never sent over AppMessage)
+  var internalKeys = [
+    'DISPLAY_WEATHER'  // weather validity flag persisted in C
+  ];
+
+  var allExpectedKeys = clayKeys.concat(weatherDataKeys, controlKeys, internalKeys).sort();
+
+  test('package.json messageKeys match the complete expected set', function () {
+    expect(packageKeys).toEqual(allExpectedKeys);
+  });
+
+  test('no key exists in package.json without being categorized', function () {
+    packageKeys.forEach(function (key) {
+      expect(allExpectedKeys).toContain(key);
+    });
+  });
+
+  test('no expected key is missing from package.json', function () {
+    allExpectedKeys.forEach(function (key) {
+      expect(packageKeys).toContain(key);
+    });
   });
 });
 

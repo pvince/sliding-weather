@@ -7,6 +7,7 @@ jest.mock('@rebble/clay', function () {
 
 require('../mocks/pebble');
 var weather = require('../../src/pkjs/weather');
+var mk      = require('../../build/js/message_keys.json');
 
 // Load index.js — registers all Pebble event listeners synchronously.
 require('../../src/pkjs/index');
@@ -48,7 +49,7 @@ describe('ready', function () {
     _handlers.ready();
     expect(Pebble.sendAppMessage).toHaveBeenCalledTimes(1);
     var msg = Pebble.sendAppMessage.mock.calls[0][0];
-    expect(msg[10024]).toBe(1); // JS_READY = 10024
+    expect(msg[mk.JS_READY]).toBe(1);
   });
 });
 
@@ -58,7 +59,9 @@ describe('ready', function () {
 
 describe('appmessage', function () {
   test('calls weather.getWeather when GET_WEATHER key is present', function () {
-    _handlers.appmessage({ payload: { 10011: 1 } }); // GET_WEATHER = 10011
+    var payload = {};
+    payload[mk.GET_WEATHER] = 1;
+    _handlers.appmessage({ payload: payload });
     expect(weather.getWeather).toHaveBeenCalledTimes(1);
   });
 
@@ -68,8 +71,11 @@ describe('appmessage', function () {
   });
 
   test('passes GPS flag and location from payload to weather.getWeather', function () {
-    // WEATHER_USE_GPS = 10022, WEATHER_LOCATION = 10023
-    _handlers.appmessage({ payload: { 10011: 1, 10022: 1, 10023: 'Paris' } });
+    var payload = {};
+    payload[mk.GET_WEATHER] = 1;
+    payload[mk.WEATHER_USE_GPS] = 1;
+    payload[mk.WEATHER_LOCATION] = 'Paris';
+    _handlers.appmessage({ payload: payload });
     var args = weather.getWeather.mock.calls[0][0];
     expect(args.useGPS).toBe(1);
     expect(args.location).toBe('Paris');
@@ -77,7 +83,9 @@ describe('appmessage', function () {
 
   test('passes stored API key to weather.getWeather', function () {
     global.localStorage.setItem('sliding_weather_owm_api_key', 'stored-key');
-    _handlers.appmessage({ payload: { 10011: 1 } });
+    var payload = {};
+    payload[mk.GET_WEATHER] = 1;
+    _handlers.appmessage({ payload: payload });
     var args = weather.getWeather.mock.calls[0][0];
     expect(args.apiKey).toBe('stored-key');
   });
@@ -86,16 +94,18 @@ describe('appmessage', function () {
     weather.getWeather.mockImplementation(function (opts, cb) {
       cb(null, { tempF: 72, tempC: 22, conditions: 'Clouds', conditionCode: 804 }, null);
     });
-    _handlers.appmessage({ payload: { 10011: 1 } });
+    var payload = {};
+    payload[mk.GET_WEATHER] = 1;
+    _handlers.appmessage({ payload: payload });
     expect(Pebble.sendAppMessage).toHaveBeenCalledTimes(1);
     var msg = Pebble.sendAppMessage.mock.calls[0][0];
-    expect(msg[10012]).toBe(72);       // TEMPERATURE
-    expect(msg[10000]).toBe(22);       // TEMPERATURE_IN_C
-    expect(msg[10001]).toBe('Clouds'); // CONDITIONS
-    expect(msg[10019]).toBe(804);      // CONDITION_CODE
+    expect(msg[mk.TEMPERATURE]).toBe(72);
+    expect(msg[mk.TEMPERATURE_IN_C]).toBe(22);
+    expect(msg[mk.CONDITIONS]).toBe('Clouds');
+    expect(msg[mk.CONDITION_CODE]).toBe(804);
     // No forecast data — hi/lo keys should be absent
-    expect(msg).not.toHaveProperty('10015'); // TEMPERATURE_LO
-    expect(msg).not.toHaveProperty('10016'); // TEMPERATURE_HI
+    expect(msg).not.toHaveProperty(String(mk.TEMPERATURE_LO));
+    expect(msg).not.toHaveProperty(String(mk.TEMPERATURE_HI));
   });
 
   test('includes hi/lo forecast data in AppMessage when available', function () {
@@ -106,53 +116,63 @@ describe('appmessage', function () {
         { loF: 55, hiF: 80, loC: 13, hiC: 27 }
       );
     });
-    _handlers.appmessage({ payload: { 10011: 1 } });
+    var payload = {};
+    payload[mk.GET_WEATHER] = 1;
+    _handlers.appmessage({ payload: payload });
     var msg = Pebble.sendAppMessage.mock.calls[0][0];
-    expect(msg[10015]).toBe(55); // TEMPERATURE_LO
-    expect(msg[10016]).toBe(80); // TEMPERATURE_HI
-    expect(msg[10017]).toBe(13); // TEMPERATURE_IN_C_LO
-    expect(msg[10018]).toBe(27); // TEMPERATURE_IN_C_HI
+    expect(msg[mk.TEMPERATURE_LO]).toBe(55);
+    expect(msg[mk.TEMPERATURE_HI]).toBe(80);
+    expect(msg[mk.TEMPERATURE_IN_C_LO]).toBe(13);
+    expect(msg[mk.TEMPERATURE_IN_C_HI]).toBe(27);
   });
 
   test('sends error status to watch when weather fetch fails with No API Key', function () {
     weather.getWeather.mockImplementation(function (opts, cb) {
       cb({ message: 'No API Key' });
     });
-    _handlers.appmessage({ payload: { 10011: 1 } });
+    var payload = {};
+    payload[mk.GET_WEATHER] = 1;
+    _handlers.appmessage({ payload: payload });
     expect(Pebble.sendAppMessage).toHaveBeenCalledTimes(1);
     var msg = Pebble.sendAppMessage.mock.calls[0][0];
-    expect(msg[10001]).toBe('No API Key'); // CONDITIONS
-    expect(msg).not.toHaveProperty('10012'); // No TEMPERATURE
+    expect(msg[mk.CONDITIONS]).toBe('No API Key');
+    expect(msg).not.toHaveProperty(String(mk.TEMPERATURE));
   });
 
   test('sends error status to watch when weather fetch fails with Invalid API Key', function () {
     weather.getWeather.mockImplementation(function (opts, cb) {
       cb({ message: 'Invalid API Key' });
     });
-    _handlers.appmessage({ payload: { 10011: 1 } });
+    var payload = {};
+    payload[mk.GET_WEATHER] = 1;
+    _handlers.appmessage({ payload: payload });
     var msg = Pebble.sendAppMessage.mock.calls[0][0];
-    expect(msg[10001]).toBe('Invalid API Key');
-    expect(msg).not.toHaveProperty('10012');
+    expect(msg[mk.CONDITIONS]).toBe('Invalid API Key');
+    expect(msg).not.toHaveProperty(String(mk.TEMPERATURE));
   });
 
   test('sends error status to watch when weather fetch fails with Network Error', function () {
     weather.getWeather.mockImplementation(function (opts, cb) {
       cb({ message: 'Network Error' });
     });
-    _handlers.appmessage({ payload: { 10011: 1 } });
+    var payload = {};
+    payload[mk.GET_WEATHER] = 1;
+    _handlers.appmessage({ payload: payload });
     var msg = Pebble.sendAppMessage.mock.calls[0][0];
-    expect(msg[10001]).toBe('Network Error');
-    expect(msg).not.toHaveProperty('10012');
+    expect(msg[mk.CONDITIONS]).toBe('Network Error');
+    expect(msg).not.toHaveProperty(String(mk.TEMPERATURE));
   });
 
   test('sends error status to watch when weather fetch fails with No Location', function () {
     weather.getWeather.mockImplementation(function (opts, cb) {
       cb({ message: 'No Location' });
     });
-    _handlers.appmessage({ payload: { 10011: 1 } });
+    var payload = {};
+    payload[mk.GET_WEATHER] = 1;
+    _handlers.appmessage({ payload: payload });
     var msg = Pebble.sendAppMessage.mock.calls[0][0];
-    expect(msg[10001]).toBe('No Location');
-    expect(msg).not.toHaveProperty('10012');
+    expect(msg[mk.CONDITIONS]).toBe('No Location');
+    expect(msg).not.toHaveProperty(String(mk.TEMPERATURE));
   });
 
   // Real hardware delivers payload keys as string names, not numeric IDs.
