@@ -7,7 +7,7 @@
 #define NUM_TIME_LINES     3
 #define TIME_WORD_MAXLEN   16
 #define LINE_H             49
-#define LINE_GAP           -10
+#define LINE_GAP           -15
 #define SLIDE_DURATION_MS  800
 
 #define CONDITIONS_MAXLEN      32
@@ -58,8 +58,8 @@ static const char *s_ones[] = {
   "six", "seven", "eight", "nine"
 };
 static const char *s_teens[] = {
-  "ten", "eleven", "twelve", "thirteen", "fourteen",
-  "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"
+  "ten", "eleven", "twelve", "thirteen", "four\nteen",
+  "fifteen", "sixteen", "seven\nteen", "eight\nteen", "nine\nteen"
 };
 static const char *s_tens[] = {
   "", "", "twenty", "thirty", "forty", "fifty"
@@ -150,14 +150,25 @@ static GFont prv_weather_font(int readability) {
 // Word time computation
 // ============================================================
 
-// Pick the appropriate minute font based on text length.
-// Teen words >= 8 chars (thirteen, fourteen, seventeen, eighteen, nineteen)
-// are too wide for FONT_KEY_BITHAM_42_LIGHT in the available layer width.
-static GFont prv_min_font(const char *text) {
+// Adjust a minute-line layout for long words (>= 8 chars).  Short words use
+// the default padded width; long words (e.g. teens like "thirteen") get full
+// screen width so they fit in FONT_KEY_BITHAM_42_LIGHT.  Words containing a
+// newline (e.g. "seven\nteen") also get double height for the wrapped line.
+static void prv_adjust_line_for_text(int idx, const char *text) {
+  Layer *root = window_get_root_layer(s_window);
+  GRect bounds = layer_get_bounds(root);
+  int16_t padding = PBL_IF_ROUND_ELSE(20, 4);
+
   if (strlen(text) >= 8) {
-    return fonts_get_system_font(FONT_KEY_GOTHIC_28);
+    s_line_target[idx].origin.x = 0;
+    s_line_target[idx].size.w   = bounds.size.w;
+  } else {
+    s_line_target[idx].origin.x = padding;
+    s_line_target[idx].size.w   = bounds.size.w - 2 * padding;
   }
-  return fonts_get_system_font(FONT_KEY_BITHAM_42_LIGHT);
+  s_line_target[idx].size.h = strchr(text, '\n') ? LINE_H * 2 : LINE_H;
+  text_layer_set_font(s_time_layer[idx],
+                      fonts_get_system_font(FONT_KEY_BITHAM_42_LIGHT));
 }
 
 static void prv_compute_time_words(int hour, int minute,
@@ -248,7 +259,7 @@ static void prv_set_time(struct tm *tick_time) {
       strncpy(s_time_text[i], new_text[i], TIME_WORD_MAXLEN - 1);
       s_time_text[i][TIME_WORD_MAXLEN - 1] = '\0';
       if (i > 0) {
-        text_layer_set_font(s_time_layer[i], prv_min_font(s_time_text[i]));
+        prv_adjust_line_for_text(i, s_time_text[i]);
       }
       text_layer_set_text(s_time_layer[i], s_time_text[i]);
       prv_slide_in_line(i);
@@ -756,7 +767,8 @@ static void prv_window_load(Window *window) {
     strncpy(s_time_text[i], init_text[i], TIME_WORD_MAXLEN - 1);
     s_time_text[i][TIME_WORD_MAXLEN - 1] = '\0';
     if (i > 0 && s_time_text[i][0] != '\0') {
-      text_layer_set_font(s_time_layer[i], prv_min_font(s_time_text[i]));
+      prv_adjust_line_for_text(i, s_time_text[i]);
+      layer_set_frame(text_layer_get_layer(s_time_layer[i]), s_line_target[i]);
     }
     text_layer_set_text(s_time_layer[i], s_time_text[i]);
     if (s_time_text[i][0] == '\0') {

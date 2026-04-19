@@ -5,7 +5,7 @@ A Pebble watchface with sliding digit time animation and OpenWeatherMap weather 
 ## Features
 
 - **Sliding time animation** — each word slides in from the right on every minute tick; single-digit minutes display directly (e.g. "eleven / three" for 11:03) without a separate "o" prefix line
-- **Adaptive font sizing** — long teen words (thirteen, fourteen, seventeen, eighteen, nineteen) automatically switch to a smaller font so they display fully without clipping
+- **Adaptive font sizing** — long teen words use `BITHAM_42_LIGHT` at full screen width, with explicit line breaks for words that don't fit on one line (e.g. "seven\nteen"); shorter teens like "thirteen" fit on a single line at the same font size
 - **Live weather** — current temperature + conditions, with optional daily hi/lo on wrist shake
 - **Weather status feedback** — clear on-screen messages for error states: "No API Key", "Invalid API Key", "Loading...", "Network Error", "No Location", "API Rate Limit"
 - **Configurable** — colors, temperature unit (F/C), weather update frequency, GPS or static location, date display, font sizes, alignment, Bluetooth vibration
