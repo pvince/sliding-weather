@@ -12,7 +12,6 @@
 #define DEFAULT_SHAKE_LOHI     0
 #define DEFAULT_VIBBRATE_BT    1
 #define DEFAULT_WEATHER_GPS    1
-#define DEFAULT_WD_ALIGNMENT   ALIGN_CENTER
 #define DEFAULT_HM_ALIGNMENT   ALIGN_LEFT
 #define DEFAULT_WD_READABILITY RDBL_SMALL
 
@@ -30,7 +29,6 @@ static int     s_use_celsius;
 static int     s_display_o_prefix;
 static int     s_display_date;
 static int     s_shake_for_lohi;
-static int     s_weatherdate_alignment;
 static int     s_hourminutes_alignment;
 static int     s_weatherdate_readability;
 static int     s_weather_frequency;   // minutes
@@ -64,12 +62,27 @@ GTextAlignment config_text_alignment(int val) {
 }
 
 #if !defined(PBL_PLATFORM_APLITE)
-GFont config_weather_font(void) {
+GFont config_weather_bold_font(void) {
   switch (s_weatherdate_readability) {
-    case RDBL_SMALL:      return fonts_get_system_font(FONT_KEY_GOTHIC_18);
-    case RDBL_LARGE:      return fonts_get_system_font(FONT_KEY_GOTHIC_24);
+    case RDBL_LARGE:
     case RDBL_LARGE_BOLD: return fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD);
-    default:              return fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD);
+    default:              return fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);
+  }
+}
+
+GFont config_weather_regular_font(void) {
+  switch (s_weatherdate_readability) {
+    case RDBL_LARGE:
+    case RDBL_LARGE_BOLD: return fonts_get_system_font(FONT_KEY_GOTHIC_24);
+    default:              return fonts_get_system_font(FONT_KEY_GOTHIC_14);
+  }
+}
+
+int16_t config_weather_row_height(void) {
+  switch (s_weatherdate_readability) {
+    case RDBL_LARGE:
+    case RDBL_LARGE_BOLD: return 26;
+    default:              return 18;
   }
 }
 #endif
@@ -102,8 +115,6 @@ void config_init(void) {
     ? persist_read_int(MESSAGE_KEY_VIBBRATE_BT_STATUS) : DEFAULT_VIBBRATE_BT;
   s_weather_use_gps = persist_exists(MESSAGE_KEY_WEATHER_USE_GPS)
     ? persist_read_int(MESSAGE_KEY_WEATHER_USE_GPS) : DEFAULT_WEATHER_GPS;
-  s_weatherdate_alignment = persist_exists(MESSAGE_KEY_WEATHERDATE_ALIGNMENT)
-    ? persist_read_int(MESSAGE_KEY_WEATHERDATE_ALIGNMENT) : DEFAULT_WD_ALIGNMENT;
   s_hourminutes_alignment = persist_exists(MESSAGE_KEY_HOURMINUTES_ALIGNMENT)
     ? persist_read_int(MESSAGE_KEY_HOURMINUTES_ALIGNMENT) : DEFAULT_HM_ALIGNMENT;
   s_weatherdate_readability = persist_exists(MESSAGE_KEY_WEATHERDATE_READABILITY)
@@ -195,12 +206,6 @@ bool config_handle_inbox(DictionaryIterator *iter) {
     s_weather_location[sizeof(s_weather_location) - 1] = '\0';
     persist_write_string(MESSAGE_KEY_WEATHER_LOCATION, s_weather_location);
   }
-  Tuple *wda_t = dict_find(iter, MESSAGE_KEY_WEATHERDATE_ALIGNMENT);
-  if (wda_t) {
-    s_weatherdate_alignment = (int)wda_t->value->int32;
-    persist_write_int(MESSAGE_KEY_WEATHERDATE_ALIGNMENT, s_weatherdate_alignment);
-    changed = true;
-  }
   Tuple *hma_t = dict_find(iter, MESSAGE_KEY_HOURMINUTES_ALIGNMENT);
   if (hma_t) {
     s_hourminutes_alignment = (int)hma_t->value->int32;
@@ -233,7 +238,6 @@ int config_get_display_date(void)           { return s_display_date; }
 int config_get_shake_for_lohi(void)         { return s_shake_for_lohi; }
 int config_get_vibbrate_bt(void)            { return s_vibbrate_bt; }
 int config_get_weather_use_gps(void)        { return s_weather_use_gps; }
-int config_get_weatherdate_alignment(void)  { return s_weatherdate_alignment; }
 int config_get_hourminutes_alignment(void)  { return s_hourminutes_alignment; }
 int config_get_weatherdate_readability(void) { return s_weatherdate_readability; }
 

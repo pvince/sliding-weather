@@ -86,20 +86,30 @@ static void __attribute__((unused)) prv_unobstructed_did_change(void *context) {
   (void)context;
   Layer *root = window_get_root_layer(s_window);
   GRect bounds = layer_get_unobstructed_bounds(root);
+  int16_t w = bounds.size.w;
   int16_t h = bounds.size.h;
   int16_t padding = PBL_IF_ROUND_ELSE(20, 4);
 
   int16_t time_block_h = NUM_TIME_LINES * LINE_H + (NUM_TIME_LINES - 1) * LINE_GAP;
 
 #if !defined(PBL_PLATFORM_APLITE)
-  int16_t weather_y = PBL_IF_ROUND_ELSE(10, 2);
-  int16_t row_h = 22;
-  int16_t date_y = h - row_h - PBL_IF_ROUND_ELSE(10, 2);
-  int16_t time_top = weather_y + row_h;
-  int16_t time_bottom = date_y;
-  int16_t time_start_y = time_top + (time_bottom - time_top - time_block_h) / 2;
+  int16_t row_h = config_weather_row_height();
+  int16_t bottom_h = (int16_t)(2 * row_h);
+  int16_t bottom_y = (int16_t)(h - bottom_h - PBL_IF_ROUND_ELSE(10, 2));
+  int16_t content_w = (int16_t)(w - 2 * padding);
+  int16_t left_w = (int16_t)(content_w * 3 / 10);
+  int16_t right_w = (int16_t)(content_w - left_w);
+  int16_t left_x = padding;
+  int16_t right_x = (int16_t)(padding + left_w);
 
-  weather_relayout(weather_y, date_y, padding);
+  // Time pushed toward top
+  int16_t time_start_y = PBL_IF_ROUND_ELSE(10, 2);
+  // Clamp so time doesn't overlap bottom section
+  if (time_start_y + time_block_h > bottom_y) {
+    time_start_y = (int16_t)(bottom_y - time_block_h);
+  }
+
+  weather_relayout(bottom_y, row_h, left_w, right_w, left_x, right_x);
 #else
   int16_t time_start_y = (h - time_block_h) / 2;
 #endif
@@ -114,23 +124,31 @@ static void __attribute__((unused)) prv_unobstructed_did_change(void *context) {
 static void prv_window_load(Window *window) {
   Layer *root = window_get_root_layer(window);
   GRect bounds = layer_get_unobstructed_bounds(root);
+  int16_t w = bounds.size.w;
   int16_t h = bounds.size.h;
   int16_t padding = PBL_IF_ROUND_ELSE(20, 4);
 
   int16_t time_block_h = NUM_TIME_LINES * LINE_H + (NUM_TIME_LINES - 1) * LINE_GAP;
 
 #if !defined(PBL_PLATFORM_APLITE)
-  // Weather at top
-  int16_t weather_y = PBL_IF_ROUND_ELSE(10, 2);
-  int16_t row_h = 22;
-  // Date at bottom
-  int16_t date_y = h - row_h - PBL_IF_ROUND_ELSE(10, 2);
-  // Time words centered between weather bottom and date top
-  int16_t time_top = weather_y + row_h;
-  int16_t time_bottom = date_y;
-  int16_t time_start_y = time_top + (time_bottom - time_top - time_block_h) / 2;
+  // Bottom info area: 2 rows (temp+conditions left, day+date right)
+  int16_t row_h = config_weather_row_height();
+  int16_t bottom_h = (int16_t)(2 * row_h);
+  int16_t bottom_y = (int16_t)(h - bottom_h - PBL_IF_ROUND_ELSE(10, 2));
+  int16_t content_w = (int16_t)(w - 2 * padding);
+  int16_t left_w = (int16_t)(content_w * 3 / 10);
+  int16_t right_w = (int16_t)(content_w - left_w);
+  int16_t left_x = padding;
+  int16_t right_x = (int16_t)(padding + left_w);
 
-  weather_create(window, weather_y, date_y, padding);
+  // Time pushed toward top
+  int16_t time_start_y = PBL_IF_ROUND_ELSE(10, 2);
+  // Clamp so time doesn't overlap bottom section
+  if (time_start_y + time_block_h > bottom_y) {
+    time_start_y = (int16_t)(bottom_y - time_block_h);
+  }
+
+  weather_create(window, bottom_y, row_h, left_w, right_w, left_x, right_x);
 #else
   int16_t time_start_y = (h - time_block_h) / 2;
 #endif

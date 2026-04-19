@@ -6,11 +6,13 @@ A Pebble watchface with sliding digit time animation and OpenWeatherMap weather 
 
 - **Sliding time animation** — each word slides in from the right on every minute tick; single-digit minutes display directly (e.g. "eleven / three" for 11:03) without a separate "o" prefix line
 - **Adaptive font sizing** — long teen words use `BITHAM_42_LIGHT` at full screen width, with explicit line breaks for words that don't fit on one line (e.g. "seven\nteen"); shorter teens like "thirteen" fit on a single line at the same font size
-- **Live weather** — current temperature + conditions, with optional daily hi/lo on wrist shake
+- **Live weather** — temperature (bold) and conditions displayed bottom-left; optional daily hi/lo on wrist shake
+- **Day & date display** — day name (bold) and full date with ordinal suffix (e.g. "april 19th, 2026") displayed bottom-right
 - **Weather status feedback** — clear on-screen messages for error states: "No API Key", "Invalid API Key", "Loading...", "Network Error", "No Location", "API Rate Limit"
-- **Configurable** — colors, temperature unit (F/C), weather update frequency, GPS or static location, date display, font sizes, alignment, Bluetooth vibration (powered by [Clay](https://github.com/pebble-dev/clay)) (powered by [Clay](https://github.com/pebble-dev/clay))
+- **Configurable** — colors, temperature unit (F/C), weather update frequency, GPS or static location, date display, font sizes, time alignment, Bluetooth vibration (powered by [Clay](https://github.com/pebble-dev/clay))
 - **All platforms** — aplite, basalt, chalk, diorite, emery, flint, gabbro (7 platforms)
 - **Aplite time-only** — original Pebble (aplite) displays time only; weather excluded to fit within memory constraints
+- **Compact weather/date layout** — bottom info area uses `GOTHIC_14` / `GOTHIC_14_BOLD` (small readability) or `GOTHIC_24` / `GOTHIC_24_BOLD` (large readability), with a 30/70 column split (weather left, date right) so long month names like "november" and "december" display without truncation
 - **Bluetooth disconnect indicator** — displays a ✗ symbol in the top-right corner when Bluetooth is disconnected; hidden when connected
 - **Round watch layout** — Chalk (Pebble Time Round) automatically hides alignment options via Clay capabilitiesay capabilities
 
@@ -85,7 +87,7 @@ pebble install --emulator emery     # large display (200×228)
 | C main | `src/c/main.c` | App entry point, window lifecycle, tick/BT/inbox handlers, unobstructed area handler |
 | Config module | `src/c/modules/config.h/.c` | Config state, persistence, color/alignment/font helpers, inbox config parsing |
 | Time display module | `src/c/modules/time_display.h/.c` | Word computation, slide animation, time layer create/destroy/relayout |
-| Weather module | `src/c/modules/weather.h/.c` | Weather/date layers, OWM request/timer, tap handler, persisted cache (color platforms only) |
+| Weather module | `src/c/modules/weather.h/.c` | Temperature, conditions, day, and date layers in split bottom layout; OWM request/timer, tap handler, persisted cache (color platforms only) |
 | BT indicator module | `src/c/modules/bt_indicator.h/.c` | Bluetooth disconnect indicator — shows ✗ in top-right corner when BT is disconnected (all platforms) |
 | PebbleKit JS entry | `src/pkjs/index.ts` | Pebble event listeners (`ready`, `appmessage`); Clay initialization |
 | Weather logic | `src/pkjs/weather.ts` | OWM API requests, response parsing, Kelvin→F/C conversions |
@@ -131,6 +133,5 @@ All keys defined in `package.json → pebble.messageKeys`. Generated as `MESSAGE
 | `DISPLAY_DATE` | JS→C | 1 = show date row |
 | `SHAKE_FOR_LOHI` | JS→C | 1 = enable shake to toggle hi/lo |
 | `VIBBRATE_BT_STATUS` | JS→C | 1 = vibrate on Bluetooth disconnect |
-| `WEATHERDATE_ALIGNMENT` | JS→C | 0=center, 1=left, 2=right |
 | `HOURMINUTES_ALIGNMENT` | JS→C | 0=center, 1=left, 2=right |
 | `WEATHERDATE_READABILITY` | JS→C | 0=small, 1=small bold, 2=large, 3=large bold |
