@@ -14,7 +14,8 @@
     "lint": "biome lint src/pkjs test",
     "format": "biome format --write src/pkjs test",
     "check": "biome check --write src/pkjs test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "emu-settings": "bun run scripts/load-emu-settings.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",

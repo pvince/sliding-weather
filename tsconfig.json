@@ -10,5 +10,5 @@
     "noEmit": true,
     "typeRoots": ["./types", "./node_modules/@types"]
   },
-  "include": ["src/pkjs/**/*.ts", "test/**/*.ts"]
+  "include": ["src/pkjs/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"]
 }

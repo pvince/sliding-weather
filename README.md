@@ -22,11 +22,24 @@ A Pebble watchface with sliding digit time animation and OpenWeatherMap weather 
 ## Setup
 
 1. Clone this repo
-2. Build with `pebble build`
-3. Install on your watch: `pebble install --emulator basalt` (or a physical device)
-4. Open the watchface settings from the Pebble app on your phone
-5. Paste your OpenWeatherMap API key
-6. Configure colors, location, and other preferences
+2. Copy the config template and fill in your API key:
+   ```bash
+   cp settings.local.json.template settings.local.json
+   # edit settings.local.json and replace the placeholder with your real key
+   ```
+3. Build with `bun run build`
+4. Install on your watch: `pebble install --emulator basalt` (or a physical device)
+5. **Emulator only** — inject your API key into the emulator's localStorage:
+   ```bash
+   bun run emu-settings          # writes to all target platforms
+   bun run emu-settings basalt   # writes to one specific platform
+   ```
+   This writes directly to the Pebble phone simulator's persistent storage
+   (`~/.pebble-sdk/<sdk>/<platform>/localstorage/<uuid>`), so no browser is
+   required. Run it once; the key persists between emulator sessions.
+6. Configure colors, location, and other preferences via the watchface settings
+
+> `settings.local.json` is gitignored and never committed. `settings.local.json.template` is the committed scaffold.
 
 ## Configuration (Clay)
 

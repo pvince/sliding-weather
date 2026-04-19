@@ -2,5 +2,6 @@ node_modules/
 build/
 dist/
 .vscode/
-*.pbw
+/*.pbw
 .lock-waf*
+settings.local.json
