@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES5",
+    "module": "CommonJS",
+    "lib": ["ES5", "DOM"],
+    "strict": true,
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "outDir": "dist/pkjs",
+    "rootDir": "src/pkjs",
+    "skipLibCheck": true,
+    "declaration": false,
+    "typeRoots": ["./types"]
+  },
+  "include": ["src/pkjs/**/*.ts"],
+  "exclude": ["node_modules", "dist", "test"]
+}

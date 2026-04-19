@@ -7,11 +7,19 @@
   ],
   "private": true,
   "scripts": {
-    "test": "jest"
+    "test": "bun test",
+    "build:ts": "tsc -p tsconfig.build.json",
+    "build": "bun run build:ts && pebble build",
+    "clean": "rm -rf dist/ && pebble clean",
+    "lint": "biome lint src/pkjs test",
+    "format": "biome format --write src/pkjs test",
+    "check": "biome check --write src/pkjs test",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "jest": "^29.0.0",
-    "jest-environment-jsdom": "^29.0.0"
+    "@biomejs/biome": "^1.9.0",
+    "@types/bun": "^1.0.0",
+    "typescript": "^5.0.0"
   },
   "dependencies": {
     "@rebble/clay": "^1.0.8"
@@ -70,16 +78,5 @@
     "resources": {
       "media": []
     }
-  },
-  "jest": {
-    "projects": [
-      {
-        "displayName": "pkjs",
-        "testMatch": [
-          "<rootDir>/test/pkjs/**/*.test.js"
-        ],
-        "testEnvironment": "node"
-      }
-    ]
   }
 }

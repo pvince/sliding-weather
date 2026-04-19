@@ -48,7 +48,7 @@ def build(ctx):
 
     ctx.set_group('bundle')
     ctx.pbl_bundle(binaries=binaries,
-                   js=ctx.path.ant_glob(['src/pkjs/**/*.js',
-                                         'src/pkjs/**/*.json',
+                   js=ctx.path.ant_glob(['dist/pkjs/**/*.js',
+                                         'dist/pkjs/**/*.json',
                                          'src/common/**/*.js']),
-                   js_entry_file='src/pkjs/index.js')
+                   js_entry_file='dist/pkjs/index.js')
