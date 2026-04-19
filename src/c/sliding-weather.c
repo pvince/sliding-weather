@@ -150,6 +150,16 @@ static GFont prv_weather_font(int readability) {
 // Word time computation
 // ============================================================
 
+// Pick the appropriate minute font based on text length.
+// Teen words >= 8 chars (thirteen, fourteen, seventeen, eighteen, nineteen)
+// are too wide for FONT_KEY_BITHAM_42_LIGHT in the available layer width.
+static GFont prv_min_font(const char *text) {
+  if (strlen(text) >= 8) {
+    return fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);
+  }
+  return fonts_get_system_font(FONT_KEY_BITHAM_42_LIGHT);
+}
+
 static void prv_compute_time_words(int hour, int minute,
                                    char out[NUM_TIME_LINES][TIME_WORD_MAXLEN]) {
   // hour is already 1..12
@@ -238,6 +248,9 @@ static void prv_set_time(struct tm *tick_time) {
     } else if (new_text[i][0] != '\0' && strcmp(new_text[i], s_time_text[i]) != 0) {
       strncpy(s_time_text[i], new_text[i], TIME_WORD_MAXLEN - 1);
       s_time_text[i][TIME_WORD_MAXLEN - 1] = '\0';
+      if (i > 0) {
+        text_layer_set_font(s_time_layer[i], prv_min_font(s_time_text[i]));
+      }
       text_layer_set_text(s_time_layer[i], s_time_text[i]);
       prv_slide_in_line(i);
     }
@@ -743,6 +756,9 @@ static void prv_window_load(Window *window) {
   for (int i = 0; i < NUM_TIME_LINES; i++) {
     strncpy(s_time_text[i], init_text[i], TIME_WORD_MAXLEN - 1);
     s_time_text[i][TIME_WORD_MAXLEN - 1] = '\0';
+    if (i > 0 && s_time_text[i][0] != '\0') {
+      text_layer_set_font(s_time_layer[i], prv_min_font(s_time_text[i]));
+    }
     text_layer_set_text(s_time_layer[i], s_time_text[i]);
     if (s_time_text[i][0] == '\0') {
       layer_set_hidden(text_layer_get_layer(s_time_layer[i]), true);
