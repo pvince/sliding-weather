@@ -155,7 +155,7 @@ static GFont prv_weather_font(int readability) {
 // are too wide for FONT_KEY_BITHAM_42_LIGHT in the available layer width.
 static GFont prv_min_font(const char *text) {
   if (strlen(text) >= 8) {
-    return fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);
+    return fonts_get_system_font(FONT_KEY_GOTHIC_28);
   }
   return fonts_get_system_font(FONT_KEY_BITHAM_42_LIGHT);
 }
@@ -171,10 +171,9 @@ static void prv_compute_time_words(int hour, int minute,
     out[1][TIME_WORD_MAXLEN - 1] = '\0';
     out[2][0] = '\0';
   } else if (minute >= 1 && minute <= 9) {
-    strncpy(out[1], "o", TIME_WORD_MAXLEN - 1);
+    strncpy(out[1], s_ones[minute], TIME_WORD_MAXLEN - 1);
     out[1][TIME_WORD_MAXLEN - 1] = '\0';
-    strncpy(out[2], s_ones[minute], TIME_WORD_MAXLEN - 1);
-    out[2][TIME_WORD_MAXLEN - 1] = '\0';
+    out[2][0] = '\0';
   } else if (minute >= 10 && minute <= 19) {
     strncpy(out[1], s_teens[minute - 10], TIME_WORD_MAXLEN - 1);
     out[1][TIME_WORD_MAXLEN - 1] = '\0';

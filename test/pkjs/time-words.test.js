@@ -60,27 +60,27 @@ describe('computeTimeWords — minute :00', function () {
 });
 
 // ============================================================
-// computeTimeWords — minutes :01-:09 (o + ones)
+// computeTimeWords — minutes :01-:09 (ones only)
 // ============================================================
 
 describe('computeTimeWords — minutes :01-:09', function () {
-  test(':01 produces hour + o + one', function () {
-    expect(tw.computeTimeWords(3, 1)).toEqual(['three', 'o', 'one']);
+  test(':01 produces hour + one', function () {
+    expect(tw.computeTimeWords(3, 1)).toEqual(['three', 'one']);
   });
 
-  test(':05 produces hour + o + five', function () {
-    expect(tw.computeTimeWords(3, 5)).toEqual(['three', 'o', 'five']);
+  test(':05 produces hour + five', function () {
+    expect(tw.computeTimeWords(3, 5)).toEqual(['three', 'five']);
   });
 
-  test(':09 produces hour + o + nine', function () {
-    expect(tw.computeTimeWords(3, 9)).toEqual(['three', 'o', 'nine']);
+  test(':09 produces hour + nine', function () {
+    expect(tw.computeTimeWords(3, 9)).toEqual(['three', 'nine']);
   });
 
   test('all single-digit minutes 1-9', function () {
     var ones = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
     for (var m = 1; m <= 9; m++) {
       var words = tw.computeTimeWords(1, m);
-      expect(words).toEqual(['one', 'o', ones[m - 1]]);
+      expect(words).toEqual(['one', ones[m - 1]]);
     }
   });
 });
@@ -183,8 +183,8 @@ describe('computeTimeWords — matches screenshots', function () {
     expect(tw.computeTimeWords(10, 45)).toEqual(['ten', 'forty', 'five']);
   });
 
-  test('3:05 → three / o / five', function () {
-    expect(tw.computeTimeWords(3, 5)).toEqual(['three', 'o', 'five']);
+  test('3:05 → three / five', function () {
+    expect(tw.computeTimeWords(3, 5)).toEqual(['three', 'five']);
   });
 });
 

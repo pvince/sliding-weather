@@ -45,7 +45,6 @@ function computeTimeWords(hour24, minute) {
   if (minute === 0) {
     result.push("o'clock");
   } else if (minute < 10) {
-    result.push('o');
     result.push(ONES[minute]);
   } else if (minute < 20) {
     result.push(TEENS[minute - 10]);
