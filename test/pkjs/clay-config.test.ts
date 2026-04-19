@@ -44,7 +44,6 @@ describe("clay-config message keys", () => {
       "DISPLAY_O_PREFIX",
       "DISPLAY_DATE",
       "VIBBRATE_BT_STATUS",
-      "WEATHERDATE_ALIGNMENT",
       "HOURMINUTES_ALIGNMENT",
       "WEATHERDATE_READABILITY",
     ];
@@ -95,7 +94,6 @@ describe("messageKey inventory (package.json completeness)", () => {
     "DISPLAY_O_PREFIX",
     "DISPLAY_DATE",
     "VIBBRATE_BT_STATUS",
-    "WEATHERDATE_ALIGNMENT",
     "HOURMINUTES_ALIGNMENT",
     "WEATHERDATE_READABILITY",
   ];
@@ -195,11 +193,6 @@ describe("clay-config defaults", () => {
     expect(item.defaultValue).toBe(true);
   });
 
-  test("WEATHERDATE_ALIGNMENT defaults to center (0)", () => {
-    const item = findItem(clayConfig, "WEATHERDATE_ALIGNMENT");
-    expect(item.defaultValue).toBe("0");
-  });
-
   test("HOURMINUTES_ALIGNMENT defaults to left (1)", () => {
     const item = findItem(clayConfig, "HOURMINUTES_ALIGNMENT");
     expect(item.defaultValue).toBe("1");
@@ -218,7 +211,7 @@ describe("clay-config capabilities", () => {
         item.type === "section" &&
         item.items &&
         item.items.some(
-          (child) => child.messageKey === "WEATHERDATE_ALIGNMENT",
+          (child) => child.messageKey === "HOURMINUTES_ALIGNMENT",
         ),
     );
     expect(layoutSection).toBeDefined();

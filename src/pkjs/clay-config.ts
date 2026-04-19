@@ -172,17 +172,6 @@ const clayConfig: ClaySection[] = [
       },
       {
         type: "select",
-        messageKey: "WEATHERDATE_ALIGNMENT",
-        label: "Weather & date alignment",
-        defaultValue: "0",
-        options: [
-          { label: "Center", value: "0" },
-          { label: "Left", value: "1" },
-          { label: "Right", value: "2" },
-        ],
-      },
-      {
-        type: "select",
         messageKey: "HOURMINUTES_ALIGNMENT",
         label: "Time alignment",
         defaultValue: "1",

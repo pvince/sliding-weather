@@ -1,11 +1,14 @@
 #include "weather.h"
 #include "config.h"
+#include <ctype.h>
 
 #if !defined(PBL_PLATFORM_APLITE)
 
 #define CONDITIONS_MAXLEN      32
-#define WEATHER_TEXT_MAXLEN    48
-#define DATE_TEXT_MAXLEN       24
+#define TEMP_TEXT_MAXLEN        16
+#define COND_TEXT_MAXLEN        32
+#define DAY_TEXT_MAXLEN         16
+#define DATE_TEXT_MAXLEN        32
 
 // Degree symbol (UTF-8)
 #define DEGREE_SYMBOL "\xc2\xb0"
@@ -15,7 +18,9 @@
 // ============================================================
 
 static Window     *s_window;
-static TextLayer  *s_weather_layer;
+static TextLayer  *s_temp_layer;
+static TextLayer  *s_conditions_layer;
+static TextLayer  *s_day_layer;
 static TextLayer  *s_date_layer;
 static int         s_temp_f;
 static int         s_temp_c;
@@ -24,12 +29,34 @@ static int         s_temp_hi_f;
 static int         s_temp_lo_c;
 static int         s_temp_hi_c;
 static char        s_conditions[CONDITIONS_MAXLEN];
-static char        s_weather_text[WEATHER_TEXT_MAXLEN];
+static char        s_temp_text[TEMP_TEXT_MAXLEN];
+static char        s_cond_text[COND_TEXT_MAXLEN];
+static char        s_day_text[DAY_TEXT_MAXLEN];
 static char        s_date_text[DATE_TEXT_MAXLEN];
 static bool        s_show_lohi;
 static bool        s_weather_valid;
 static bool        s_js_ready;
 static AppTimer   *s_weather_timer;
+
+// ============================================================
+// Helpers
+// ============================================================
+
+static void prv_to_lowercase(char *str) {
+  for (int i = 0; str[i]; i++) {
+    str[i] = (char)tolower((unsigned char)str[i]);
+  }
+}
+
+static const char *prv_ordinal_suffix(int day) {
+  if (day >= 11 && day <= 13) return "th";
+  switch (day % 10) {
+    case 1: return "st";
+    case 2: return "nd";
+    case 3: return "rd";
+    default: return "th";
+  }
+}
 
 // ============================================================
 // Weather display
@@ -38,10 +65,11 @@ static AppTimer   *s_weather_timer;
 static void prv_update_weather_display(void) {
   if (!s_weather_valid) {
     if (s_conditions[0] != '\0') {
-      text_layer_set_text(s_weather_layer, s_conditions);
+      text_layer_set_text(s_temp_layer, s_conditions);
     } else {
-      text_layer_set_text(s_weather_layer, "Loading...");
+      text_layer_set_text(s_temp_layer, "Loading...");
     }
+    text_layer_set_text(s_conditions_layer, "");
     return;
   }
 
@@ -49,22 +77,24 @@ static void prv_update_weather_display(void) {
     int lo = config_get_use_celsius() ? s_temp_lo_c : s_temp_lo_f;
     int hi = config_get_use_celsius() ? s_temp_hi_c : s_temp_hi_f;
     if (config_get_display_o_prefix()) {
-      snprintf(s_weather_text, sizeof(s_weather_text),
-               "H:%d" DEGREE_SYMBOL " L:%d" DEGREE_SYMBOL, hi, lo);
+      snprintf(s_temp_text, sizeof(s_temp_text), "H:%d" DEGREE_SYMBOL, hi);
+      snprintf(s_cond_text, sizeof(s_cond_text), "L:%d" DEGREE_SYMBOL, lo);
     } else {
-      snprintf(s_weather_text, sizeof(s_weather_text), "H:%d L:%d", hi, lo);
+      snprintf(s_temp_text, sizeof(s_temp_text), "H:%d", hi);
+      snprintf(s_cond_text, sizeof(s_cond_text), "L:%d", lo);
     }
   } else {
     int temp = config_get_use_celsius() ? s_temp_c : s_temp_f;
     if (config_get_display_o_prefix()) {
-      snprintf(s_weather_text, sizeof(s_weather_text),
-               "%d" DEGREE_SYMBOL " %s", temp, s_conditions);
+      snprintf(s_temp_text, sizeof(s_temp_text), "%d" DEGREE_SYMBOL, temp);
     } else {
-      snprintf(s_weather_text, sizeof(s_weather_text), "%d %s", temp, s_conditions);
+      snprintf(s_temp_text, sizeof(s_temp_text), "%d", temp);
     }
+    snprintf(s_cond_text, sizeof(s_cond_text), "%s", s_conditions);
   }
 
-  text_layer_set_text(s_weather_layer, s_weather_text);
+  text_layer_set_text(s_temp_layer, s_temp_text);
+  text_layer_set_text(s_conditions_layer, s_cond_text);
 }
 
 // ============================================================
@@ -134,31 +164,48 @@ static void prv_request_weather(void) {
 // Public interface
 // ============================================================
 
-void weather_create(Window *window, int16_t weather_y, int16_t date_y, int16_t padding) {
+void weather_create(Window *window, int16_t bottom_y, int16_t row_h,
+                    int16_t left_w, int16_t right_w,
+                    int16_t left_x, int16_t right_x) {
   s_window = window;
   Layer *root = window_get_root_layer(window);
-  GRect bounds = layer_get_unobstructed_bounds(root);
-  int16_t w = bounds.size.w;
-  int16_t row_h = 22;
 
-  GTextAlignment wd_align = config_text_alignment(config_get_weatherdate_alignment());
-  GFont weather_font = config_weather_font();
+  GFont bold_font    = config_weather_bold_font();
+  GFont regular_font = config_weather_regular_font();
 
-  s_weather_layer = text_layer_create(
-    GRect(padding, weather_y, (int16_t)(w - 2 * padding), row_h));
-  text_layer_set_background_color(s_weather_layer, GColorClear);
-  text_layer_set_text_color(s_weather_layer, config_get_wd_color());
-  text_layer_set_font(s_weather_layer, weather_font);
-  text_layer_set_text_alignment(s_weather_layer, wd_align);
-  text_layer_set_text(s_weather_layer, "Loading...");
-  layer_add_child(root, text_layer_get_layer(s_weather_layer));
+  // Bottom-left: temperature (bold) + conditions (regular)
+  s_temp_layer = text_layer_create(
+    GRect(left_x, bottom_y, left_w, row_h));
+  text_layer_set_background_color(s_temp_layer, GColorClear);
+  text_layer_set_text_color(s_temp_layer, config_get_wd_color());
+  text_layer_set_font(s_temp_layer, bold_font);
+  text_layer_set_text_alignment(s_temp_layer, GTextAlignmentLeft);
+  text_layer_set_text(s_temp_layer, "Loading...");
+  layer_add_child(root, text_layer_get_layer(s_temp_layer));
+
+  s_conditions_layer = text_layer_create(
+    GRect(left_x, (int16_t)(bottom_y + row_h), left_w, row_h));
+  text_layer_set_background_color(s_conditions_layer, GColorClear);
+  text_layer_set_text_color(s_conditions_layer, config_get_wd_color());
+  text_layer_set_font(s_conditions_layer, regular_font);
+  text_layer_set_text_alignment(s_conditions_layer, GTextAlignmentLeft);
+  layer_add_child(root, text_layer_get_layer(s_conditions_layer));
+
+  // Bottom-right: day name (bold) + date (regular)
+  s_day_layer = text_layer_create(
+    GRect(right_x, bottom_y, right_w, row_h));
+  text_layer_set_background_color(s_day_layer, GColorClear);
+  text_layer_set_text_color(s_day_layer, config_get_wd_color());
+  text_layer_set_font(s_day_layer, bold_font);
+  text_layer_set_text_alignment(s_day_layer, GTextAlignmentRight);
+  layer_add_child(root, text_layer_get_layer(s_day_layer));
 
   s_date_layer = text_layer_create(
-    GRect(padding, date_y, (int16_t)(w - 2 * padding), row_h));
+    GRect(right_x, (int16_t)(bottom_y + row_h), right_w, row_h));
   text_layer_set_background_color(s_date_layer, GColorClear);
   text_layer_set_text_color(s_date_layer, config_get_wd_color());
-  text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
-  text_layer_set_text_alignment(s_date_layer, wd_align);
+  text_layer_set_font(s_date_layer, regular_font);
+  text_layer_set_text_alignment(s_date_layer, GTextAlignmentRight);
   layer_add_child(root, text_layer_get_layer(s_date_layer));
 
   s_js_ready      = false;
@@ -167,10 +214,14 @@ void weather_create(Window *window, int16_t weather_y, int16_t date_y, int16_t p
 }
 
 void weather_destroy(void) {
-  text_layer_destroy(s_weather_layer);
+  text_layer_destroy(s_temp_layer);
+  text_layer_destroy(s_conditions_layer);
+  text_layer_destroy(s_day_layer);
   text_layer_destroy(s_date_layer);
-  s_weather_layer = NULL;
-  s_date_layer    = NULL;
+  s_temp_layer       = NULL;
+  s_conditions_layer = NULL;
+  s_day_layer        = NULL;
+  s_date_layer       = NULL;
   if (s_weather_timer) {
     app_timer_cancel(s_weather_timer);
     s_weather_timer = NULL;
@@ -178,16 +229,21 @@ void weather_destroy(void) {
 }
 
 void weather_apply_config(void) {
-  text_layer_set_text_color(s_weather_layer, config_get_wd_color());
-  text_layer_set_text_color(s_date_layer,    config_get_wd_color());
-  text_layer_set_background_color(s_weather_layer, GColorClear);
-  text_layer_set_background_color(s_date_layer,    GColorClear);
+  GColor wd_color = config_get_wd_color();
+  text_layer_set_text_color(s_temp_layer,       wd_color);
+  text_layer_set_text_color(s_conditions_layer,  wd_color);
+  text_layer_set_text_color(s_day_layer,         wd_color);
+  text_layer_set_text_color(s_date_layer,        wd_color);
 
-  text_layer_set_font(s_weather_layer, config_weather_font());
+  text_layer_set_background_color(s_temp_layer,       GColorClear);
+  text_layer_set_background_color(s_conditions_layer,  GColorClear);
+  text_layer_set_background_color(s_day_layer,         GColorClear);
+  text_layer_set_background_color(s_date_layer,        GColorClear);
 
-  GTextAlignment wd_align = config_text_alignment(config_get_weatherdate_alignment());
-  text_layer_set_text_alignment(s_weather_layer, wd_align);
-  text_layer_set_text_alignment(s_date_layer,    wd_align);
+  text_layer_set_font(s_temp_layer,       config_weather_bold_font());
+  text_layer_set_font(s_conditions_layer,  config_weather_regular_font());
+  text_layer_set_font(s_day_layer,         config_weather_bold_font());
+  text_layer_set_font(s_date_layer,        config_weather_regular_font());
 
   prv_update_weather_display();
 }
@@ -268,10 +324,22 @@ void weather_on_js_ready(void) {
 
 void weather_update_date(struct tm *tick_time) {
   if (!config_get_display_date()) {
+    text_layer_set_text(s_day_layer, "");
     text_layer_set_text(s_date_layer, "");
     return;
   }
-  strftime(s_date_text, sizeof(s_date_text), "%a %b %e", tick_time);
+  // Day name: lowercase full day (e.g. "sunday")
+  strftime(s_day_text, sizeof(s_day_text), "%A", tick_time);
+  prv_to_lowercase(s_day_text);
+  text_layer_set_text(s_day_layer, s_day_text);
+
+  // Date: "month dayth" (e.g. "april 19th")
+  char month[16];
+  strftime(month, sizeof(month), "%B", tick_time);
+  prv_to_lowercase(month);
+  int day = tick_time->tm_mday;
+  snprintf(s_date_text, sizeof(s_date_text), "%s %d%s",
+           month, day, prv_ordinal_suffix(day));
   text_layer_set_text(s_date_layer, s_date_text);
 }
 
@@ -283,16 +351,17 @@ void weather_tap_handler(AccelAxisType axis, int32_t direction) {
   }
 }
 
-void weather_relayout(int16_t weather_y, int16_t date_y, int16_t padding) {
-  Layer *root = window_get_root_layer(s_window);
-  GRect bounds = layer_get_unobstructed_bounds(root);
-  int16_t w = bounds.size.w;
-  int16_t row_h = 22;
-
-  layer_set_frame(text_layer_get_layer(s_weather_layer),
-    GRect(padding, weather_y, (int16_t)(w - 2 * padding), row_h));
+void weather_relayout(int16_t bottom_y, int16_t row_h,
+                      int16_t left_w, int16_t right_w,
+                      int16_t left_x, int16_t right_x) {
+  layer_set_frame(text_layer_get_layer(s_temp_layer),
+    GRect(left_x, bottom_y, left_w, row_h));
+  layer_set_frame(text_layer_get_layer(s_conditions_layer),
+    GRect(left_x, (int16_t)(bottom_y + row_h), left_w, row_h));
+  layer_set_frame(text_layer_get_layer(s_day_layer),
+    GRect(right_x, bottom_y, right_w, row_h));
   layer_set_frame(text_layer_get_layer(s_date_layer),
-    GRect(padding, date_y, (int16_t)(w - 2 * padding), row_h));
+    GRect(right_x, (int16_t)(bottom_y + row_h), right_w, row_h));
 }
 
 #endif // !PBL_PLATFORM_APLITE
