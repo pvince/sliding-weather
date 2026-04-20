@@ -1,0 +1,35 @@
+{
+  "configurations": [
+    {
+      "name": "Pebble SDK",
+      "includePath": [
+        "${workspaceFolder}/src/c/**",
+        "${workspaceFolder}/build/include/**",
+        "${workspaceFolder}/build/basalt",
+        "${env:HOME}/.pebble-sdk/SDKs/4.9.148/sdk-core/pebble/common/include",
+        "${env:HOME}/.pebble-sdk/SDKs/4.9.148/sdk-core/pebble/aplite/include",
+        "${env:HOME}/.pebble-sdk/SDKs/4.9.148/sdk-core/pebble/basalt/include",
+        "${env:HOME}/.pebble-sdk/SDKs/4.9.148/sdk-core/pebble/chalk/include",
+        "${env:HOME}/.pebble-sdk/SDKs/4.9.148/sdk-core/pebble/diorite/include",
+        "${env:HOME}/.pebble-sdk/SDKs/4.9.148/sdk-core/pebble/emery/include",
+        "${env:HOME}/.pebble-sdk/SDKs/4.9.148/sdk-core/pebble/flint/include",
+        "${env:HOME}/.pebble-sdk/SDKs/4.9.148/sdk-core/pebble/gabbro/include"
+      ],
+      "defines": [
+        "PBL_PLATFORM_BASALT"
+      ],
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "c99",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "gcc-x64",
+      "browse": {
+        "path": [
+          "${workspaceFolder}",
+          "${env:HOME}/.pebble-sdk/SDKs/4.9.148/sdk-core/pebble"
+        ],
+        "limitSymbolsToIncludedHeaders": true
+      }
+    }
+  ],
+  "version": 4
+}
