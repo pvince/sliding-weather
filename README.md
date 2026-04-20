@@ -14,7 +14,8 @@ A Pebble watchface with sliding digit time animation and OpenWeatherMap weather 
 - **Aplite time-only** — original Pebble (aplite) displays time only; weather excluded to fit within memory constraints
 - **Compact weather/date layout** — bottom info area uses `GOTHIC_14` / `GOTHIC_14_BOLD` (small readability) or `GOTHIC_24` / `GOTHIC_24_BOLD` (large readability), with a 30/70 column split (weather left, date right) so long month names like "november" and "december" display without truncation
 - **Bluetooth disconnect indicator** — displays a ✗ symbol in the top-right corner when Bluetooth is disconnected; hidden when connected
-- **Round watch layout** — Chalk (Pebble Time Round) automatically hides alignment options via Clay capabilitiesay capabilities
+- **Round watch layout** — Chalk (Pebble Time Round) automatically hides alignment options via Clay capabilities
+- **Phone selector preview** — bundled preview images and menu icon so the Pebble phone app can show representative watchface visuals in the watchface selector
 
 ## Requirements
 
@@ -79,6 +80,30 @@ pebble install --emulator chalk     # round display
 pebble install --emulator aplite    # time-only, B&W
 pebble install --emulator emery     # large display (200×228)
 ```
+
+## Watchface Preview Assets
+
+The phone app selector preview is sourced from Pebble media resources declared in `package.json`.
+
+- `resources/images/menu-icon.png` is marked as `menuIcon`.
+- `resources/images/preview-*.png` provide per-platform preview assets captured from the Pebble emulator at native device resolution.
+
+To refresh screenshots, install the watchface on each emulator, run `pebble screenshot --emulator <platform> --no-open resources/images/preview-<platform>.png`, then rebuild. Keep file names stable so resource IDs remain consistent.
+
+Native device dimensions:
+
+| Asset | Dimensions |
+|-----------|-----------|
+| `menu-icon.png` | 25x25 |
+| `preview-aplite.png` | 144x168 |
+| `preview-basalt.png` | 144x168 |
+| `preview-chalk.png` | 180x180 |
+| `preview-diorite.png` | 144x168 |
+| `preview-emery.png` | 200x228 |
+| `preview-flint.png` | 144x168 |
+| `preview-gabbro.png` | 260x260 |
+
+If you refresh screenshots, keep file names stable so resource IDs and metadata remain consistent.
 
 ## Architecture
 

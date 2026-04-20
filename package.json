@@ -76,7 +76,70 @@
       "MIN_COLOR"
     ],
     "resources": {
-      "media": []
+      "media": [
+        {
+          "menuIcon": true,
+          "type": "png",
+          "name": "IMAGE_MENU_ICON",
+          "file": "images/menu-icon.png"
+        },
+        {
+          "type": "png",
+          "name": "IMAGE_PREVIEW_APLITE",
+          "file": "images/preview-aplite.png",
+          "targetPlatforms": [
+            "aplite"
+          ]
+        },
+        {
+          "type": "png",
+          "name": "IMAGE_PREVIEW_BASALT",
+          "file": "images/preview-basalt.png",
+          "targetPlatforms": [
+            "basalt"
+          ]
+        },
+        {
+          "type": "png",
+          "name": "IMAGE_PREVIEW_CHALK",
+          "file": "images/preview-chalk.png",
+          "targetPlatforms": [
+            "chalk"
+          ]
+        },
+        {
+          "type": "png",
+          "name": "IMAGE_PREVIEW_DIORITE",
+          "file": "images/preview-diorite.png",
+          "targetPlatforms": [
+            "diorite"
+          ]
+        },
+        {
+          "type": "png",
+          "name": "IMAGE_PREVIEW_EMERY",
+          "file": "images/preview-emery.png",
+          "targetPlatforms": [
+            "emery"
+          ]
+        },
+        {
+          "type": "png",
+          "name": "IMAGE_PREVIEW_FLINT",
+          "file": "images/preview-flint.png",
+          "targetPlatforms": [
+            "flint"
+          ]
+        },
+        {
+          "type": "png",
+          "name": "IMAGE_PREVIEW_GABBRO",
+          "file": "images/preview-gabbro.png",
+          "targetPlatforms": [
+            "gabbro"
+          ]
+        }
+      ]
     }
   }
 }
