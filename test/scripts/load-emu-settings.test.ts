@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -7,9 +8,8 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { spawnSync } from "node:child_process";
+import { join } from "node:path";
 import {
   getAppUuid,
   getPebbleSdkVersion,
@@ -156,7 +156,9 @@ describe("getAppUuid", () => {
     const pkgPath = join(tmpDir, "package.json");
     writeFileSync(
       pkgPath,
-      JSON.stringify({ pebble: { uuid: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" } }),
+      JSON.stringify({
+        pebble: { uuid: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" },
+      }),
     );
     expect(getAppUuid(pkgPath)).toBe("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
   });
