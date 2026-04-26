@@ -17,3 +17,5 @@
 - Phone IP Address: 192.168.1.93
 - My pebble watch is connected to my phone with the "Dev Connection" enabled
 
+For build/test/lint/install workflow details, see `.github/DEVELOPMENT.md`.
+
