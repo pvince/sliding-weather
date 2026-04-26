@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, jest, mock, test } from "bun:test";
 import "../mocks/pebble";
 
-const STORAGE_KEY = "sliding_weather_owm_api_key";
 import customClay from "../../src/pkjs/custom-clay";
 
 function createMockClayConfig() {
@@ -9,9 +8,11 @@ function createMockClayConfig() {
   const items: Record<string, any> = {};
 
   const clayConfig = {
+    meta: {
+      userData: {},
+    },
     EVENTS: {
       AFTER_BUILD: "AFTER_BUILD",
-      BEFORE_DESTROY: "BEFORE_DESTROY",
     },
     on: jest.fn((event: string, handler: () => void) => {
       if (!handlers[event]) handlers[event] = [];
@@ -47,10 +48,9 @@ beforeEach(() => {
 });
 
 describe("custom-clay", () => {
-  test("loads stored API key into input on AFTER_BUILD", () => {
-    (globalThis as any).localStorage.setItem(STORAGE_KEY, "my-stored-key");
-
+  test("loads API key from Clay userData into input on AFTER_BUILD", () => {
     const clay = createMockClayConfig();
+    clay.meta.userData = { apiKey: "my-stored-key" };
     const apiKeyItem = createMockItem("");
     clay._addItem("owmApiKey", apiKeyItem);
 
@@ -60,7 +60,7 @@ describe("custom-clay", () => {
     expect(apiKeyItem.set).toHaveBeenCalledWith("my-stored-key");
   });
 
-  test("does not set value when no stored key exists", () => {
+  test("does not set value when no API key is provided", () => {
     const clay = createMockClayConfig();
     const apiKeyItem = createMockItem("");
     clay._addItem("owmApiKey", apiKeyItem);
@@ -71,34 +71,16 @@ describe("custom-clay", () => {
     expect(apiKeyItem.set).not.toHaveBeenCalled();
   });
 
-  test("saves API key to localStorage on BEFORE_DESTROY", () => {
+  test("does not set value when API key is an empty string", () => {
     const clay = createMockClayConfig();
-    const apiKeyItem = createMockItem("new-api-key");
-    clay._addItem("owmApiKey", apiKeyItem);
-
-    customClay.call(clay as any, {});
-    clay._trigger("AFTER_BUILD");
-    clay._trigger("BEFORE_DESTROY");
-
-    expect((globalThis as any).localStorage.setItem).toHaveBeenCalledWith(
-      STORAGE_KEY,
-      "new-api-key",
-    );
-  });
-
-  test("saves empty string when API key input is cleared", () => {
-    const clay = createMockClayConfig();
+    clay.meta.userData = { apiKey: "" };
     const apiKeyItem = createMockItem("");
     clay._addItem("owmApiKey", apiKeyItem);
 
     customClay.call(clay as any, {});
     clay._trigger("AFTER_BUILD");
-    clay._trigger("BEFORE_DESTROY");
 
-    expect((globalThis as any).localStorage.setItem).toHaveBeenCalledWith(
-      STORAGE_KEY,
-      "",
-    );
+    expect(apiKeyItem.set).not.toHaveBeenCalled();
   });
 
   test("does nothing when owmApiKey item is not found", () => {
@@ -110,22 +92,15 @@ describe("custom-clay", () => {
     }).not.toThrow();
   });
 
-  test("round-trips API key through store and load", () => {
-    const clay1 = createMockClayConfig();
-    const apiKeyItem1 = createMockItem("round-trip-key");
-    clay1._addItem("owmApiKey", apiKeyItem1);
+  test("ignores non-string API key userData", () => {
+    const clay = createMockClayConfig();
+    clay.meta.userData = { apiKey: 12345 };
+    const apiKeyItem = createMockItem("");
+    clay._addItem("owmApiKey", apiKeyItem);
 
-    customClay.call(clay1 as any, {});
-    clay1._trigger("AFTER_BUILD");
-    clay1._trigger("BEFORE_DESTROY");
+    customClay.call(clay as any, {});
+    clay._trigger("AFTER_BUILD");
 
-    const clay2 = createMockClayConfig();
-    const apiKeyItem2 = createMockItem("");
-    clay2._addItem("owmApiKey", apiKeyItem2);
-
-    customClay.call(clay2 as any, {});
-    clay2._trigger("AFTER_BUILD");
-
-    expect(apiKeyItem2.set).toHaveBeenCalledWith("round-trip-key");
+    expect(apiKeyItem.set).not.toHaveBeenCalled();
   });
 });

@@ -33,6 +33,7 @@ const clayConfig: ClaySection[] = [
       {
         type: "input",
         id: "owmApiKey",
+        messageKey: "OWM_API_KEY",
         label: "API Key",
         description:
           "Get a free key at openweathermap.org/api. Stored only on your phone.",

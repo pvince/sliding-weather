@@ -83,6 +83,10 @@ describe("clay-config message keys", () => {
     const unique = messageKeys.filter((v, i, a) => a.indexOf(v) === i);
     expect(unique.length).toBe(messageKeys.length);
   });
+
+  test("keeps API key in the Clay form config", () => {
+    expect(messageKeys).toContain("OWM_API_KEY");
+  });
 });
 
 describe("messageKey inventory (package.json completeness)", () => {
@@ -130,6 +134,10 @@ describe("messageKey inventory (package.json completeness)", () => {
     allExpectedKeys.forEach((key) => {
       expect(packageKeys).toContain(key);
     });
+  });
+
+  test("package.json does not include OWM_API_KEY", () => {
+    expect(packageKeys).not.toContain("OWM_API_KEY");
   });
 });
 
@@ -205,11 +213,11 @@ describe("clay-config API key", () => {
     return null;
   }
 
-  test("has an API key input with id but no messageKey", () => {
+  test("has an API key input with id and messageKey", () => {
     const apiKey = findById(clayConfig, "owmApiKey");
     expect(apiKey).toBeDefined();
     expect(apiKey.type).toBe("input");
-    expect(apiKey.messageKey).toBeUndefined();
+    expect(apiKey.messageKey).toBe("OWM_API_KEY");
   });
 
   test("API key input does not use password type", () => {

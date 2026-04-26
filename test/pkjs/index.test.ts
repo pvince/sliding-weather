@@ -8,9 +8,69 @@ import {
   test,
 } from "bun:test";
 
+const clayState = {
+  instance: null as null | {
+    generateUrl: ReturnType<typeof jest.fn>;
+    getSettings: ReturnType<typeof jest.fn>;
+    meta: { userData: Record<string, unknown> };
+  },
+};
+
 // Only mock third-party modules that can't be loaded in test env
 mock.module("@rebble/clay", () => ({
-  default: jest.fn(() => ({})),
+  default: Object.assign(
+    jest.fn(function MockClay() {
+    const instance = {
+      generateUrl: jest.fn(() => "https://example.com/config"),
+      getSettings: jest.fn((response: string, convert = true) => {
+        const settings = JSON.parse(response);
+        if (convert === false) {
+          return settings;
+        }
+
+        const converted: Record<string, string | number> = {
+          USE_CELSIUS: Number(settings.USE_CELSIUS?.value ?? 0),
+          WEATHER_FREQUENCY: Number(settings.WEATHER_FREQUENCY?.value ?? 30),
+        };
+
+        if (settings.OWM_API_KEY) {
+          converted.OWM_API_KEY = settings.OWM_API_KEY.value ?? "";
+        }
+
+        return converted;
+      }),
+      meta: { userData: {} },
+    };
+
+    clayState.instance = instance;
+    return instance;
+    }),
+    {
+      prepareSettingsForAppMessage: jest.fn(
+        (settings: Record<string, { value: string | number | boolean }>) => {
+          // Mirrors real Clay behaviour for all field types:
+          //   string .value  → returned as string (select, input items)
+          //   number .value  → returned as number (color picker, etc.)
+          //   boolean .value → converted to 1/0 (toggle items)
+          // OWM_API_KEY is stripped from sanitizedSettings before this is
+          // called, so it will never appear here in normal operation.
+          const converted: Record<string, string | number> = {};
+          for (const key in settings) {
+            const item = settings[key];
+            const v = (item as { value?: unknown })?.value ?? item;
+            if (typeof v === "boolean") {
+              converted[key] = v ? 1 : 0;
+            } else if (typeof v === "number") {
+              converted[key] = v;
+            } else {
+              converted[key] = String(v);
+            }
+          }
+          return converted;
+        },
+      ),
+    },
+  ),
 }));
 
 // Set up global mocks (Pebble, localStorage, etc.)
@@ -21,6 +81,16 @@ const weather = require("../../src/pkjs/weather") as {
   getWeather: ReturnType<typeof jest.fn>;
 };
 jest.spyOn(weather as any, "getWeather").mockImplementation(jest.fn());
+const cfg = require("../../src/pkjs/config") as {
+  getApiKey: () => string;
+  storeApiKey: ReturnType<typeof jest.fn>;
+};
+jest.spyOn(cfg as any, "storeApiKey");
+const ClayModule = require("@rebble/clay") as {
+  default: {
+    prepareSettingsForAppMessage: ReturnType<typeof jest.fn>;
+  };
+};
 const mk = require("../../build/js/message_keys.json") as Record<
   string,
   number
@@ -31,17 +101,25 @@ require("../../src/pkjs/index");
 
 // Capture handlers immediately, before any mock.clearAllMocks() calls
 const _handlers: Record<string, (...args: any[]) => any> = {};
-["ready", "appmessage"].forEach((name) => {
+["ready", "appmessage", "showConfiguration", "webviewclosed"].forEach(
+  (name) => {
   const call = (Pebble as any).addEventListener.mock.calls.find(
     (c: any[]) => c[0] === name,
   );
   if (call) _handlers[name] = call[1];
-});
+  },
+);
 
 beforeEach(() => {
   (globalThis as any).localStorage._reset();
   mock.clearAllMocks();
   (Pebble as any).getActiveWatchInfo.mockReturnValue({ platform: "basalt" });
+  if (clayState.instance) {
+    clayState.instance.generateUrl.mockClear();
+    clayState.instance.getSettings.mockClear();
+    clayState.instance.meta.userData = {};
+  }
+  ClayModule.default.prepareSettingsForAppMessage.mockClear();
 });
 
 describe("event listener registration", () => {
@@ -51,6 +129,192 @@ describe("event listener registration", () => {
 
   test("registers appmessage handler", () => {
     expect(_handlers.appmessage).toBeDefined();
+  });
+
+  test("registers showConfiguration handler", () => {
+    expect(_handlers.showConfiguration).toBeDefined();
+  });
+
+  test("registers webviewclosed handler", () => {
+    expect(_handlers.webviewclosed).toBeDefined();
+  });
+});
+
+describe("configuration lifecycle", () => {
+  test("opens Clay config with the stored API key in userData", () => {
+    (globalThis as any).localStorage.setItem(
+      "sliding_weather_owm_api_key",
+      "stored-key",
+    );
+
+    _handlers.showConfiguration();
+
+    expect(clayState.instance?.meta.userData.apiKey).toBe("stored-key");
+    expect(clayState.instance?.generateUrl).toHaveBeenCalledTimes(1);
+    expect(Pebble.openURL).toHaveBeenCalledWith("https://example.com/config");
+  });
+
+  test("opens Clay config when no API key is stored", () => {
+    _handlers.showConfiguration();
+
+    expect(clayState.instance?.meta.userData.apiKey).toBe("");
+    expect(clayState.instance?.generateUrl).toHaveBeenCalledTimes(1);
+    expect(Pebble.openURL).toHaveBeenCalledWith("https://example.com/config");
+  });
+
+  test("stores API key and forwards config settings on webviewclosed", () => {
+    const response = JSON.stringify({
+      OWM_API_KEY: { value: "new-key" },
+      USE_CELSIUS: { value: "1" },
+      WEATHER_FREQUENCY: { value: "60" },
+    });
+    const sanitizedResponse = JSON.stringify({
+      USE_CELSIUS: { value: "1" },
+      WEATHER_FREQUENCY: { value: "60" },
+    });
+
+    _handlers.webviewclosed({ response: response });
+
+    expect(clayState.instance?.getSettings).toHaveBeenCalledWith(response, false);
+    expect(ClayModule.default.prepareSettingsForAppMessage).toHaveBeenCalledWith(
+      JSON.parse(sanitizedResponse),
+    );
+    expect(cfg.storeApiKey).toHaveBeenCalledWith("new-key");
+    expect(Pebble.sendAppMessage).toHaveBeenCalledWith(
+      {
+        USE_CELSIUS: 1,
+        WEATHER_FREQUENCY: 60,
+      },
+      expect.any(Function),
+      expect.any(Function),
+    );
+  });
+
+  test("clears the stored API key when the config submits an empty value", () => {
+    const response = JSON.stringify({
+      OWM_API_KEY: { value: "" },
+      USE_CELSIUS: { value: "0" },
+    });
+    const sanitizedResponse = JSON.stringify({
+      USE_CELSIUS: { value: "0" },
+    });
+
+    _handlers.webviewclosed({ response: response });
+
+    expect(clayState.instance?.getSettings).toHaveBeenCalledWith(response, false);
+    expect(ClayModule.default.prepareSettingsForAppMessage).toHaveBeenCalledWith(
+      JSON.parse(sanitizedResponse),
+    );
+    expect(cfg.storeApiKey).toHaveBeenCalledWith("");
+    expect(Pebble.sendAppMessage).toHaveBeenCalledWith(
+      {
+        USE_CELSIUS: 0,
+      },
+      expect.any(Function),
+      expect.any(Function),
+    );
+  });
+
+  test("filters the API key when Clay returns numeric message-key ids", () => {
+    const response = JSON.stringify({
+      OWM_API_KEY: { value: "hardware-key" },
+      USE_CELSIUS: { value: "1" },
+    });
+    const sanitizedResponse = JSON.stringify({
+      USE_CELSIUS: { value: "1" },
+    });
+
+    clayState.instance?.getSettings.mockImplementationOnce(
+      (_response: string, convert = true) => {
+        if (convert === false) {
+          return {
+            OWM_API_KEY: { value: "hardware-key" },
+            USE_CELSIUS: { value: "1" },
+          };
+        }
+
+        return {
+          [mk.USE_CELSIUS]: 1,
+        };
+      },
+    );
+    ClayModule.default.prepareSettingsForAppMessage.mockImplementationOnce(() => ({
+      [mk.USE_CELSIUS]: 1,
+    }));
+
+    _handlers.webviewclosed({ response: response });
+
+    expect(clayState.instance?.getSettings).toHaveBeenCalledWith(response, false);
+    expect(ClayModule.default.prepareSettingsForAppMessage).toHaveBeenCalledWith(
+      JSON.parse(sanitizedResponse),
+    );
+    expect(cfg.storeApiKey).toHaveBeenCalledWith("hardware-key");
+    expect(Pebble.sendAppMessage).toHaveBeenCalledWith(
+      {
+        [mk.USE_CELSIUS]: 1,
+      },
+      expect.any(Function),
+      expect.any(Function),
+    );
+  });
+
+  test("coerces Fahrenheit (USE_CELSIUS='0') string to number 0 before sending", () => {
+    const response = JSON.stringify({
+      USE_CELSIUS: { value: "0" },
+    });
+
+    _handlers.webviewclosed({ response: response });
+
+    expect(Pebble.sendAppMessage).toHaveBeenCalledWith(
+      { USE_CELSIUS: 0 },
+      expect.any(Function),
+      expect.any(Function),
+    );
+  });
+
+  test("does not coerce non-numeric string setting values (e.g., location)", () => {
+    const response = JSON.stringify({
+      WEATHER_LOCATION: { value: "London, UK" },
+    });
+
+    _handlers.webviewclosed({ response: response });
+
+    expect(Pebble.sendAppMessage).toHaveBeenCalledWith(
+      { WEATHER_LOCATION: "London, UK" },
+      expect.any(Function),
+      expect.any(Function),
+    );
+  });
+
+  test("ignores webviewclosed events without a response", () => {
+    _handlers.webviewclosed(null);
+    _handlers.webviewclosed({ response: null });
+
+    expect(cfg.storeApiKey).not.toHaveBeenCalled();
+    expect(Pebble.sendAppMessage).not.toHaveBeenCalled();
+  });
+
+  test("forwards config when raw settings omit OWM_API_KEY entirely", () => {
+    const response = JSON.stringify({
+      USE_CELSIUS: { value: "1" },
+      WEATHER_FREQUENCY: { value: "15" },
+    });
+
+    _handlers.webviewclosed({ response: response });
+
+    expect(clayState.instance?.getSettings).toHaveBeenCalledWith(response, false);
+    expect(ClayModule.default.prepareSettingsForAppMessage).toHaveBeenCalledWith(
+      JSON.parse(response),
+    );
+    expect(cfg.storeApiKey).not.toHaveBeenCalled();
+    expect(Pebble.sendAppMessage).toHaveBeenCalledWith(
+      {
+        USE_CELSIUS: 1,
+        WEATHER_FREQUENCY: 15,
+      },
+      expect.any(Function),
+      expect.any(Function),
+    );
   });
 });
 
