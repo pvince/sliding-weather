@@ -7,13 +7,6 @@ export interface CurrentWeather {
   conditionCode: number;
 }
 
-export interface Forecast {
-  loF: number;
-  hiF: number;
-  loC: number;
-  hiC: number;
-}
-
 export interface WeatherError {
   message: string;
 }
@@ -36,14 +29,9 @@ interface OWMCurrentResponse {
   weather?: Array<{ main?: string; id?: number }>;
 }
 
-interface OWMForecastResponse {
-  list?: Array<{ temp?: { min: number; max: number } }>;
-}
-
 type WeatherCallback = (
   err: WeatherError | null,
   current?: CurrentWeather | null,
-  forecast?: Forecast | null,
 ) => void;
 
 export function kelvinToF(k: number): number {
@@ -62,14 +50,6 @@ export function buildCurrentWeatherUrl(opts: UrlOptions): string {
   return `${base}q=${encodeURIComponent(opts.location || "")}&appid=${opts.apiKey}`;
 }
 
-export function buildForecastUrl(opts: UrlOptions): string {
-  const base = `${OWM_BASE}forecast/daily?cnt=1&`;
-  if (opts.lat !== undefined && opts.lon !== undefined) {
-    return `${base}lat=${opts.lat}&lon=${opts.lon}&appid=${opts.apiKey}`;
-  }
-  return `${base}q=${encodeURIComponent(opts.location || "")}&appid=${opts.apiKey}`;
-}
-
 export function parseCurrentWeather(
   json: OWMCurrentResponse | null,
 ): CurrentWeather | null {
@@ -82,21 +62,6 @@ export function parseCurrentWeather(
     tempC: kelvinToC(tempK),
     conditions: json.weather[0].main || "Unknown",
     conditionCode: json.weather[0].id || 0,
-  };
-}
-
-export function parseForecast(
-  json: OWMForecastResponse | null,
-): Forecast | null {
-  if (!json || !json.list || !json.list[0] || !json.list[0].temp) {
-    return null;
-  }
-  const t = json.list[0].temp;
-  return {
-    loF: kelvinToF(t.min),
-    hiF: kelvinToF(t.max),
-    loC: kelvinToC(t.min),
-    hiC: kelvinToC(t.max),
   };
 }
 
@@ -158,13 +123,7 @@ export function getWeather(
         onComplete({ message: "Weather Error" });
         return;
       }
-      httpGet(buildForecastUrl(coordOpts), (errF, forecast) => {
-        const forecastData =
-          errF || !forecast
-            ? null
-            : parseForecast(forecast as OWMForecastResponse);
-        onComplete(null, currentData, forecastData);
-      });
+      onComplete(null, currentData);
     });
   }
 
@@ -182,13 +141,7 @@ export function getWeather(
         onComplete({ message: "Weather Error" });
         return;
       }
-      httpGet(buildForecastUrl(locOpts), (errF, forecast) => {
-        const forecastData =
-          errF || !forecast
-            ? null
-            : parseForecast(forecast as OWMForecastResponse);
-        onComplete(null, currentData, forecastData);
-      });
+      onComplete(null, currentData);
     });
   }
 

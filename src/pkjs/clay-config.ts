@@ -39,7 +39,6 @@ const clayConfig: ClaySection[] = [
         defaultValue: "",
         attributes: {
           placeholder: "Paste your OWM API key here",
-          type: "password",
         },
       },
     ],
@@ -127,12 +126,6 @@ const clayConfig: ClaySection[] = [
           { label: "Every 2 hours", value: "120" },
         ],
       },
-      {
-        type: "toggle",
-        messageKey: "SHAKE_FOR_LOHI",
-        label: "Shake for hi/lo temps",
-        defaultValue: false,
-      },
     ],
   },
   {
@@ -144,63 +137,9 @@ const clayConfig: ClaySection[] = [
       },
       {
         type: "toggle",
-        messageKey: "DISPLAY_O_PREFIX",
-        label: "Show degree symbol",
-        defaultValue: true,
-      },
-      {
-        type: "toggle",
-        messageKey: "DISPLAY_DATE",
-        label: "Show date",
-        defaultValue: true,
-      },
-      {
-        type: "toggle",
         messageKey: "VIBBRATE_BT_STATUS",
         label: "Vibrate on BT disconnect",
         defaultValue: true,
-      },
-    ],
-  },
-  {
-    type: "section",
-    capabilities: ["RECT"],
-    items: [
-      {
-        type: "heading",
-        defaultValue: "Layout",
-      },
-      {
-        type: "select",
-        messageKey: "HOURMINUTES_ALIGNMENT",
-        label: "Time alignment",
-        defaultValue: "1",
-        options: [
-          { label: "Center", value: "0" },
-          { label: "Left", value: "1" },
-          { label: "Right", value: "2" },
-        ],
-      },
-    ],
-  },
-  {
-    type: "section",
-    items: [
-      {
-        type: "heading",
-        defaultValue: "Readability",
-      },
-      {
-        type: "select",
-        messageKey: "WEATHERDATE_READABILITY",
-        label: "Weather text size",
-        defaultValue: "0",
-        options: [
-          { label: "Small", value: "0" },
-          { label: "Small Bold", value: "1" },
-          { label: "Large", value: "2" },
-          { label: "Large Bold", value: "3" },
-        ],
       },
     ],
   },

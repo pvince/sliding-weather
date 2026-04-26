@@ -40,15 +40,23 @@ describe("clay-config message keys", () => {
       "WEATHER_LOCATION",
       "USE_CELSIUS",
       "WEATHER_FREQUENCY",
-      "SHAKE_FOR_LOHI",
-      "DISPLAY_O_PREFIX",
-      "DISPLAY_DATE",
       "VIBBRATE_BT_STATUS",
-      "HOURMINUTES_ALIGNMENT",
-      "WEATHERDATE_READABILITY",
     ];
     expected.forEach((key) => {
       expect(messageKeys).toContain(key);
+    });
+  });
+
+  test("does not include removed config keys", () => {
+    const removed = [
+      "SHAKE_FOR_LOHI",
+      "DISPLAY_O_PREFIX",
+      "DISPLAY_DATE",
+      "HOURMINUTES_ALIGNMENT",
+      "WEATHERDATE_READABILITY",
+    ];
+    removed.forEach((key) => {
+      expect(messageKeys).not.toContain(key);
     });
   });
 
@@ -90,12 +98,7 @@ describe("messageKey inventory (package.json completeness)", () => {
     "WEATHER_LOCATION",
     "USE_CELSIUS",
     "WEATHER_FREQUENCY",
-    "SHAKE_FOR_LOHI",
-    "DISPLAY_O_PREFIX",
-    "DISPLAY_DATE",
     "VIBBRATE_BT_STATUS",
-    "HOURMINUTES_ALIGNMENT",
-    "WEATHERDATE_READABILITY",
   ];
 
   const weatherDataKeys = [
@@ -103,10 +106,6 @@ describe("messageKey inventory (package.json completeness)", () => {
     "TEMPERATURE_IN_C",
     "CONDITIONS",
     "CONDITION_CODE",
-    "TEMPERATURE_LO",
-    "TEMPERATURE_HI",
-    "TEMPERATURE_IN_C_LO",
-    "TEMPERATURE_IN_C_HI",
   ];
 
   const controlKeys = ["GET_WEATHER", "JS_READY"];
@@ -173,51 +172,13 @@ describe("clay-config defaults", () => {
     expect(item.defaultValue).toBe("0");
   });
 
-  test("SHAKE_FOR_LOHI defaults to false", () => {
-    const item = findItem(clayConfig, "SHAKE_FOR_LOHI");
-    expect(item.defaultValue).toBe(false);
-  });
-
-  test("DISPLAY_O_PREFIX defaults to true", () => {
-    const item = findItem(clayConfig, "DISPLAY_O_PREFIX");
-    expect(item.defaultValue).toBe(true);
-  });
-
-  test("DISPLAY_DATE defaults to true", () => {
-    const item = findItem(clayConfig, "DISPLAY_DATE");
-    expect(item.defaultValue).toBe(true);
-  });
-
   test("VIBBRATE_BT_STATUS defaults to true", () => {
     const item = findItem(clayConfig, "VIBBRATE_BT_STATUS");
     expect(item.defaultValue).toBe(true);
   });
-
-  test("HOURMINUTES_ALIGNMENT defaults to left (1)", () => {
-    const item = findItem(clayConfig, "HOURMINUTES_ALIGNMENT");
-    expect(item.defaultValue).toBe("1");
-  });
-
-  test("WEATHERDATE_READABILITY defaults to small (0)", () => {
-    const item = findItem(clayConfig, "WEATHERDATE_READABILITY");
-    expect(item.defaultValue).toBe("0");
-  });
 });
 
 describe("clay-config capabilities", () => {
-  test("layout section is RECT-only", () => {
-    const layoutSection = clayConfig.find(
-      (item) =>
-        item.type === "section" &&
-        item.items &&
-        item.items.some(
-          (child) => child.messageKey === "HOURMINUTES_ALIGNMENT",
-        ),
-    );
-    expect(layoutSection).toBeDefined();
-    expect(layoutSection?.capabilities).toEqual(["RECT"]);
-  });
-
   test("colors section requires COLOR capability", () => {
     const colorSection = clayConfig.find(
       (item) =>
@@ -251,8 +212,8 @@ describe("clay-config API key", () => {
     expect(apiKey.messageKey).toBeUndefined();
   });
 
-  test("API key input uses password type", () => {
+  test("API key input does not use password type", () => {
     const apiKey = findById(clayConfig, "owmApiKey");
-    expect(apiKey.attributes.type).toBe("password");
+    expect(apiKey.attributes.type).toBeUndefined();
   });
 });

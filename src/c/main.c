@@ -93,7 +93,7 @@ static void __attribute__((unused)) prv_unobstructed_did_change(void *context) {
   int16_t time_block_h = NUM_TIME_LINES * LINE_H + (NUM_TIME_LINES - 1) * LINE_GAP;
 
 #if !defined(PBL_PLATFORM_APLITE)
-  int16_t row_h = config_weather_row_height();
+  int16_t row_h = 18;
   int16_t bottom_h = (int16_t)(2 * row_h);
   int16_t bottom_y = (int16_t)(h - bottom_h - PBL_IF_ROUND_ELSE(10, 2));
   int16_t content_w = (int16_t)(w - 2 * padding);
@@ -132,7 +132,7 @@ static void prv_window_load(Window *window) {
 
 #if !defined(PBL_PLATFORM_APLITE)
   // Bottom info area: 2 rows (temp+conditions left, day+date right)
-  int16_t row_h = config_weather_row_height();
+  int16_t row_h = 18;
   int16_t bottom_h = (int16_t)(2 * row_h);
   int16_t bottom_y = (int16_t)(h - bottom_h - PBL_IF_ROUND_ELSE(10, 2));
   int16_t content_w = (int16_t)(w - 2 * padding);
@@ -201,10 +201,6 @@ static void prv_init(void) {
   tick_timer_service_subscribe(MINUTE_UNIT, prv_tick_handler);
   bluetooth_connection_service_subscribe(prv_bt_handler);
 
-#if !defined(PBL_PLATFORM_APLITE)
-  accel_tap_service_subscribe(weather_tap_handler);
-#endif
-
   unobstructed_area_service_subscribe((UnobstructedAreaHandlers){
     .did_change = prv_unobstructed_did_change,
   }, NULL);
@@ -216,10 +212,6 @@ static void prv_deinit(void) {
   tick_timer_service_unsubscribe();
   bluetooth_connection_service_unsubscribe();
   unobstructed_area_service_unsubscribe();
-
-#if !defined(PBL_PLATFORM_APLITE)
-  accel_tap_service_unsubscribe();
-#endif
 
   window_destroy(s_window);
 }

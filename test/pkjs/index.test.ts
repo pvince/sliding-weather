@@ -104,7 +104,6 @@ describe("appmessage", () => {
       cb(
         null,
         { tempF: 72, tempC: 22, conditions: "Clouds", conditionCode: 804 },
-        null,
       );
     });
     const payload: Record<string | number, unknown> = {};
@@ -116,26 +115,6 @@ describe("appmessage", () => {
     expect(msg[mk.TEMPERATURE_IN_C]).toBe(22);
     expect(msg[mk.CONDITIONS]).toBe("Clouds");
     expect(msg[mk.CONDITION_CODE]).toBe(804);
-    expect(msg).not.toHaveProperty(String(mk.TEMPERATURE_LO));
-    expect(msg).not.toHaveProperty(String(mk.TEMPERATURE_HI));
-  });
-
-  test("includes hi/lo forecast data in AppMessage when available", () => {
-    weather.getWeather.mockImplementation((opts: any, cb: any) => {
-      cb(
-        null,
-        { tempF: 72, tempC: 22, conditions: "Clouds", conditionCode: 804 },
-        { loF: 55, hiF: 80, loC: 13, hiC: 27 },
-      );
-    });
-    const payload: Record<string | number, unknown> = {};
-    payload[mk.GET_WEATHER] = 1;
-    _handlers.appmessage({ payload: payload });
-    const msg = (Pebble.sendAppMessage as any).mock.calls[0][0];
-    expect(msg[mk.TEMPERATURE_LO]).toBe(55);
-    expect(msg[mk.TEMPERATURE_HI]).toBe(80);
-    expect(msg[mk.TEMPERATURE_IN_C_LO]).toBe(13);
-    expect(msg[mk.TEMPERATURE_IN_C_HI]).toBe(27);
   });
 
   test("sends error status to watch when weather fetch fails with No API Key", () => {

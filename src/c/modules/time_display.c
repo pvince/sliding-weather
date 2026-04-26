@@ -142,8 +142,7 @@ void time_display_create(Window *window, int16_t start_y, int16_t padding) {
 
   GFont hr_font  = fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD);
   GFont min_font = fonts_get_system_font(FONT_KEY_BITHAM_42_LIGHT);
-  GTextAlignment time_align = config_text_alignment(config_get_hourminutes_alignment());
-
+  GTextAlignment time_align = GTextAlignmentLeft;
   for (int i = 0; i < NUM_TIME_LINES; i++) {
     int16_t ly = start_y + i * (LINE_H + LINE_GAP);
     s_line_target[i] = GRect(padding, ly, w - 2 * padding, LINE_H);
@@ -195,7 +194,7 @@ void time_display_set_time(struct tm *tick_time) {
 }
 
 void time_display_apply_config(void) {
-  GTextAlignment time_align = config_text_alignment(config_get_hourminutes_alignment());
+  GTextAlignment time_align = GTextAlignmentLeft;
   for (int i = 0; i < NUM_TIME_LINES; i++) {
     text_layer_set_text_color(s_time_layer[i], (i == 0) ? config_get_hr_color() : config_get_min_color());
     text_layer_set_text_alignment(s_time_layer[i], time_align);

@@ -24,16 +24,11 @@ static TextLayer  *s_day_layer;
 static TextLayer  *s_date_layer;
 static int         s_temp_f;
 static int         s_temp_c;
-static int         s_temp_lo_f;
-static int         s_temp_hi_f;
-static int         s_temp_lo_c;
-static int         s_temp_hi_c;
 static char        s_conditions[CONDITIONS_MAXLEN];
 static char        s_temp_text[TEMP_TEXT_MAXLEN];
 static char        s_cond_text[COND_TEXT_MAXLEN];
 static char        s_day_text[DAY_TEXT_MAXLEN];
 static char        s_date_text[DATE_TEXT_MAXLEN];
-static bool        s_show_lohi;
 static bool        s_weather_valid;
 static bool        s_js_ready;
 static AppTimer   *s_weather_timer;
@@ -73,25 +68,9 @@ static void prv_update_weather_display(void) {
     return;
   }
 
-  if (s_show_lohi && config_get_shake_for_lohi()) {
-    int lo = config_get_use_celsius() ? s_temp_lo_c : s_temp_lo_f;
-    int hi = config_get_use_celsius() ? s_temp_hi_c : s_temp_hi_f;
-    if (config_get_display_o_prefix()) {
-      snprintf(s_temp_text, sizeof(s_temp_text), "H:%d" DEGREE_SYMBOL, hi);
-      snprintf(s_cond_text, sizeof(s_cond_text), "L:%d" DEGREE_SYMBOL, lo);
-    } else {
-      snprintf(s_temp_text, sizeof(s_temp_text), "H:%d", hi);
-      snprintf(s_cond_text, sizeof(s_cond_text), "L:%d", lo);
-    }
-  } else {
-    int temp = config_get_use_celsius() ? s_temp_c : s_temp_f;
-    if (config_get_display_o_prefix()) {
-      snprintf(s_temp_text, sizeof(s_temp_text), "%d" DEGREE_SYMBOL, temp);
-    } else {
-      snprintf(s_temp_text, sizeof(s_temp_text), "%d", temp);
-    }
-    snprintf(s_cond_text, sizeof(s_cond_text), "%s", s_conditions);
-  }
+  int temp = config_get_use_celsius() ? s_temp_c : s_temp_f;
+  snprintf(s_temp_text, sizeof(s_temp_text), "%d" DEGREE_SYMBOL, temp);
+  snprintf(s_cond_text, sizeof(s_cond_text), "%s", s_conditions);
 
   text_layer_set_text(s_temp_layer, s_temp_text);
   text_layer_set_text(s_conditions_layer, s_cond_text);
@@ -170,8 +149,8 @@ void weather_create(Window *window, int16_t bottom_y, int16_t row_h,
   s_window = window;
   Layer *root = window_get_root_layer(window);
 
-  GFont bold_font    = config_weather_bold_font();
-  GFont regular_font = config_weather_regular_font();
+  GFont bold_font    = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);
+  GFont regular_font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
 
   // Bottom-left: temperature (bold) + conditions (regular)
   s_temp_layer = text_layer_create(
@@ -209,7 +188,6 @@ void weather_create(Window *window, int16_t bottom_y, int16_t row_h,
   layer_add_child(root, text_layer_get_layer(s_date_layer));
 
   s_js_ready      = false;
-  s_show_lohi     = false;
   s_weather_timer = NULL;
 }
 
@@ -240,10 +218,10 @@ void weather_apply_config(void) {
   text_layer_set_background_color(s_day_layer,         GColorClear);
   text_layer_set_background_color(s_date_layer,        GColorClear);
 
-  text_layer_set_font(s_temp_layer,       config_weather_bold_font());
-  text_layer_set_font(s_conditions_layer,  config_weather_regular_font());
-  text_layer_set_font(s_day_layer,         config_weather_bold_font());
-  text_layer_set_font(s_date_layer,        config_weather_regular_font());
+  text_layer_set_font(s_temp_layer,       fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD));
+  text_layer_set_font(s_conditions_layer,  fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  text_layer_set_font(s_day_layer,         fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD));
+  text_layer_set_font(s_date_layer,        fonts_get_system_font(FONT_KEY_GOTHIC_14));
 
   prv_update_weather_display();
 }
@@ -260,14 +238,6 @@ void weather_load_persisted(void) {
         s_temp_f = persist_read_int(MESSAGE_KEY_TEMPERATURE);
       if (persist_exists(MESSAGE_KEY_TEMPERATURE_IN_C))
         s_temp_c = persist_read_int(MESSAGE_KEY_TEMPERATURE_IN_C);
-      if (persist_exists(MESSAGE_KEY_TEMPERATURE_LO))
-        s_temp_lo_f = persist_read_int(MESSAGE_KEY_TEMPERATURE_LO);
-      if (persist_exists(MESSAGE_KEY_TEMPERATURE_HI))
-        s_temp_hi_f = persist_read_int(MESSAGE_KEY_TEMPERATURE_HI);
-      if (persist_exists(MESSAGE_KEY_TEMPERATURE_IN_C_LO))
-        s_temp_lo_c = persist_read_int(MESSAGE_KEY_TEMPERATURE_IN_C_LO);
-      if (persist_exists(MESSAGE_KEY_TEMPERATURE_IN_C_HI))
-        s_temp_hi_c = persist_read_int(MESSAGE_KEY_TEMPERATURE_IN_C_HI);
     }
   }
 }
@@ -286,14 +256,6 @@ void weather_handle_inbox(DictionaryIterator *iter) {
     strncpy(s_conditions, cond_t->value->cstring, sizeof(s_conditions) - 1);
     s_conditions[sizeof(s_conditions) - 1] = '\0';
   }
-  Tuple *tlo_t  = dict_find(iter, MESSAGE_KEY_TEMPERATURE_LO);
-  if (tlo_t)  s_temp_lo_f = (int)tlo_t->value->int32;
-  Tuple *thi_t  = dict_find(iter, MESSAGE_KEY_TEMPERATURE_HI);
-  if (thi_t)  s_temp_hi_f = (int)thi_t->value->int32;
-  Tuple *tloc_t = dict_find(iter, MESSAGE_KEY_TEMPERATURE_IN_C_LO);
-  if (tloc_t) s_temp_lo_c = (int)tloc_t->value->int32;
-  Tuple *thic_t = dict_find(iter, MESSAGE_KEY_TEMPERATURE_IN_C_HI);
-  if (thic_t) s_temp_hi_c = (int)thic_t->value->int32;
 
   if (temp_t) {
     s_weather_valid = true;
@@ -301,10 +263,6 @@ void weather_handle_inbox(DictionaryIterator *iter) {
     persist_write_int(MESSAGE_KEY_TEMPERATURE, s_temp_f);
     persist_write_int(MESSAGE_KEY_TEMPERATURE_IN_C, s_temp_c);
     persist_write_string(MESSAGE_KEY_CONDITIONS, s_conditions);
-    if (tlo_t)  persist_write_int(MESSAGE_KEY_TEMPERATURE_LO, s_temp_lo_f);
-    if (thi_t)  persist_write_int(MESSAGE_KEY_TEMPERATURE_HI, s_temp_hi_f);
-    if (tloc_t) persist_write_int(MESSAGE_KEY_TEMPERATURE_IN_C_LO, s_temp_lo_c);
-    if (thic_t) persist_write_int(MESSAGE_KEY_TEMPERATURE_IN_C_HI, s_temp_hi_c);
     prv_update_weather_display();
   } else if (cond_t) {
     // Status/error message — no temperature means it's not real weather data
@@ -323,11 +281,6 @@ void weather_on_js_ready(void) {
 }
 
 void weather_update_date(struct tm *tick_time) {
-  if (!config_get_display_date()) {
-    text_layer_set_text(s_day_layer, "");
-    text_layer_set_text(s_date_layer, "");
-    return;
-  }
   // Day name: lowercase full day (e.g. "sunday")
   strftime(s_day_text, sizeof(s_day_text), "%A", tick_time);
   prv_to_lowercase(s_day_text);
@@ -341,14 +294,6 @@ void weather_update_date(struct tm *tick_time) {
   snprintf(s_date_text, sizeof(s_date_text), "%s %d%s",
            month, day, prv_ordinal_suffix(day));
   text_layer_set_text(s_date_layer, s_date_text);
-}
-
-void weather_tap_handler(AccelAxisType axis, int32_t direction) {
-  (void)axis; (void)direction;
-  if (config_get_shake_for_lohi() && s_weather_valid) {
-    s_show_lohi = !s_show_lohi;
-    prv_update_weather_display();
-  }
 }
 
 void weather_relayout(int16_t bottom_y, int16_t row_h,

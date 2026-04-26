@@ -46,7 +46,7 @@ Pebble.addEventListener("appmessage", (e) => {
       useGPS: getPayload(payload, mk.WEATHER_USE_GPS) ? 1 : 0,
       location: (getPayload(payload, mk.WEATHER_LOCATION) as string) || "",
     },
-    (err, currentData, forecastData) => {
+    (err, currentData) => {
       if (err) {
         const errMsg: Record<number, string> = {};
         errMsg[mk.CONDITIONS] = err.message;
@@ -70,13 +70,6 @@ Pebble.addEventListener("appmessage", (e) => {
         msg[mk.TEMPERATURE_IN_C] = currentData.tempC;
         msg[mk.CONDITIONS] = currentData.conditions;
         msg[mk.CONDITION_CODE] = currentData.conditionCode;
-      }
-
-      if (forecastData) {
-        msg[mk.TEMPERATURE_LO] = forecastData.loF;
-        msg[mk.TEMPERATURE_HI] = forecastData.hiF;
-        msg[mk.TEMPERATURE_IN_C_LO] = forecastData.loC;
-        msg[mk.TEMPERATURE_IN_C_HI] = forecastData.hiC;
       }
 
       Pebble.sendAppMessage(

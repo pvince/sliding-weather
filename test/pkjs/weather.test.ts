@@ -79,29 +79,6 @@ describe("buildCurrentWeatherUrl", () => {
   });
 });
 
-describe("buildForecastUrl", () => {
-  test("uses cnt=1 for daily forecast", () => {
-    const url = weather.buildForecastUrl({ lat: 0, lon: 0, apiKey: "K" });
-    expect(url).toContain("cnt=1");
-    expect(url).toContain("/forecast/daily?");
-  });
-
-  test("uses lat/lon when provided", () => {
-    const url = weather.buildForecastUrl({
-      lat: 40.7,
-      lon: -74.0,
-      apiKey: "K2",
-    });
-    expect(url).toContain("lat=40.7");
-    expect(url).toContain("lon=-74");
-  });
-
-  test("uses q= for static location", () => {
-    const url = weather.buildForecastUrl({ location: "Berlin", apiKey: "K3" });
-    expect(url).toContain("q=Berlin");
-  });
-});
-
 describe("parseCurrentWeather", () => {
   const validResponse = {
     main: { temp: 293.15 },
@@ -144,35 +121,6 @@ describe("parseCurrentWeather", () => {
     });
     expect(r).not.toBeNull();
     expect(r?.conditionCode).toBe(0);
-  });
-});
-
-describe("parseForecast", () => {
-  const validForecast = {
-    list: [{ temp: { min: 283.15, max: 303.15 } }],
-  };
-
-  test("parses valid forecast response", () => {
-    const result = weather.parseForecast(validForecast);
-    expect(result).not.toBeNull();
-    expect(result?.loC).toBe(10);
-    expect(result?.hiC).toBe(30);
-    expect(result?.loF).toBe(50);
-    expect(result?.hiF).toBe(86);
-  });
-
-  test("returns null for null input", () => {
-    expect(weather.parseForecast(null)).toBeNull();
-  });
-
-  test("returns null when list is empty", () => {
-    expect(weather.parseForecast({ list: [] })).toBeNull();
-  });
-
-  test("returns null when temp is missing", () => {
-    expect(
-      weather.parseForecast({ list: [{ other: "data" } as any] }),
-    ).toBeNull();
   });
 });
 
@@ -258,43 +206,11 @@ describe("getWeather", () => {
       0,
     );
 
-    MockXHR.respond(
-      {
-        list: [{ temp: { min: 283.15, max: 303.15 } }],
-      },
-      1,
-    );
-
     expect(callback).toHaveBeenCalledTimes(1);
     expect(callback.mock.calls[0][0]).toBeNull();
     const current = callback.mock.calls[0][1];
-    const forecast = callback.mock.calls[0][2];
     expect(current.tempC).toBe(20);
     expect(current.conditions).toBe("Clouds");
-    expect(forecast.loC).toBe(10);
-    expect(forecast.hiC).toBe(30);
-  });
-
-  test("still calls onComplete with null forecast if forecast request fails", () => {
-    const callback = jest.fn();
-    (
-      globalThis as any
-    ).navigator.geolocation.getCurrentPosition.mockImplementationOnce(
-      (success: any) => {
-        success({ coords: { latitude: 0, longitude: 0 } });
-      },
-    );
-
-    weather.getWeather({ apiKey: "KEY", useGPS: 1 }, callback);
-    MockXHR.respond(
-      { main: { temp: 293.15 }, weather: [{ main: "Clear", id: 800 }] },
-      0,
-    );
-    MockXHR.fail(1);
-
-    expect(callback).toHaveBeenCalledTimes(1);
-    expect(callback.mock.calls[0][0]).toBeNull();
-    expect(callback.mock.calls[0][2]).toBeNull();
   });
 
   test("calls back with Invalid API Key on 401 response", () => {
@@ -393,12 +309,6 @@ describe("getWeather", () => {
       weather: [{ main: "Clear", id: 800 }],
     });
     xhr.onload?.();
-
-    const xhr2 = MockXHR._instances[1];
-    xhr2.responseText = JSON.stringify({
-      list: [{ temp: { min: 283.15, max: 303.15 } }],
-    });
-    xhr2.onload?.();
 
     expect(callback).toHaveBeenCalledTimes(1);
     expect(callback.mock.calls[0][0]).toBeNull();
